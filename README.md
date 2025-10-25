@@ -1,6 +1,7 @@
 # Emergency Department Database and Analysis System
 
 **Course:** DS 5110: Introduction to Data Management and Processing, Fall 2025
+
 **Team 22:** Suk Jin Mun, Xiaobai Li, Shaobo (Ben) Chen
 
 ## Overview
