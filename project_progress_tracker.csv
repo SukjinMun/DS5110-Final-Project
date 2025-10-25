@@ -11,7 +11,7 @@ Task,Description,Assigned,Plan Start,Plan End,Act Start,Act End,Status,Notes
 10,Setup GitHub repo,Suk Jin,Oct Week 4,Oct Week 4,Oct Week 4,,,Public repo with README and CSV
 11,Submit iteration 02,Suk Jin,Oct Week 4,Oct Week 4,,,,TBD by professor
 12,Design and implement SQLite schema,Shaobo,Iter3 Week 1,Iter3 Week 2,,,,Normalized schema with constraints and ERD
-13,Build data generation script,Shaobo,Iter3 Week 1,Iter3 Week 2,,,,Simulated ED patient visits with data.gov distributions
+13,Build data generation script,Shaobo,Iter3 Week 1,Iter3 Week 2,,,,Simulated ED patient visits with https://data.gov/ distributions
 14,Populate database,Shaobo,Iter3 Week 2,Iter3 Week 2,,,,Load generated data into SQLite via ETL pipeline
 15,Validate data integrity,Shaobo,Iter3 Week 2,Iter3 Week 3,,,,Foreign keys and referential constraints
 16,Document ETL pipeline,Shaobo,Iter3 Week 2,Iter3 Week 3,,,,Data generation and loading process
@@ -26,7 +26,7 @@ Task,Description,Assigned,Plan Start,Plan End,Act Start,Act End,Status,Notes
 25,Calculate statistical indicators,Suk Jin,Iter4 Week 2,Iter4 Week 3,,,,Conversion rates averages automatic calculations
 26,Model evaluation,All,Iter4 Week 2,Iter4 Week 3,,,,Cross-validation and performance metrics
 27,Model visualizations,Xiaobai,Iter4 Week 2,Iter4 Week 3,,,,Feature importance and prediction plots
-28,Design Flask API endpoints (OPTIONAL),Suk Jin,Iter4 Week 1,Iter4 Week 2,,,,RESTful API design receive frontend requests return JSON responses
+28,Design Flask API endpoints (OPTIONAL),Suk Jin,Iter4 Week 1,Iter4 Week 2,,,,Flask API design receive frontend requests return JSON responses
 28.5,Implement database access layer (OPTIONAL),Suk Jin,Iter4 Week 2,Iter4 Week 3,,,,Backend executes SQL queries on behalf of frontend
 29,Build Flask frontend (OPTIONAL),Xiaobai,Iter4 Week 1,Iter4 Week 3,,,,Web UI with forms calling backend API and chart display
 30,Compile final report,All,Iter5 Week 1,Iter5 Week 1,,,,Methods results recommendations
