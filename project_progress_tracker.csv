@@ -1,0 +1,39 @@
+Task,Description,Assigned,Plan Start,Plan End,Act Start,Act End,Status,Notes
+1,Form team and assign roles,All,Sep Week 1,Sep Week 2,Sep Week 1,Sep Week 2,Done,Suk Jin (backend API developer) Xiaobai (frontend developer) Shaobo (database architect)
+2,Select project topic,All,Sep Week 1,Sep Week 3,Sep Week 1,Sep Week 3,Done,Hospital database for operations
+3,Submit iteration 01,Suk Jin,Sep Week 3,Sep Week 4,Sep Week 3,Sep Week 4,Done,Submitted on Canvas
+4,Review course materials,All,Oct Week 1,Oct Week 3,Oct Week 1,Oct Week 4,Done,Weeks 1-6 lectures and reading Ch3-Ch4
+5,Review professor feedback,All,Oct Week 2,Oct Week 2,Oct Week 2,Oct Week 2,Done,Topic too broad - need specific focus
+6,Refine project scope,All,Oct Week 2,Oct Week 3,Oct Week 2,Oct Week 3,Done,ED triage classification and wait time
+7,Design database schema,Shaobo,Oct Week 3,Oct Week 4,Oct Week 3,Oct Week 4,Done,Initial schema design in 3NF
+8,Write 3-page report,All,Oct Week 3,Oct Week 4,Oct Week 3,Oct Week 4,Done,Addresses all iteration 02 requirements
+9,Create progress tracker,Suk Jin,Oct Week 4,Oct Week 4,Oct Week 4,Oct Week 4,Done,This file
+10,Setup GitHub repo,Suk Jin,Oct Week 4,Oct Week 4,Oct Week 4,,,Public repo with README and CSV
+11,Submit iteration 02,Suk Jin,Oct Week 4,Oct Week 4,,,,TBD by professor
+12,Design and implement SQLite schema,Shaobo,Iter3 Week 1,Iter3 Week 2,,,,Normalized schema with constraints and ERD
+13,Build data generation script,Shaobo,Iter3 Week 1,Iter3 Week 2,,,,Simulated ED patient visits with https://data.gov/ distributions
+14,Populate database,Shaobo,Iter3 Week 2,Iter3 Week 2,,,,Load generated data into SQLite via ETL pipeline
+15,Validate data integrity,Shaobo,Iter3 Week 2,Iter3 Week 3,,,,Foreign keys and referential constraints
+16,Document ETL pipeline,Shaobo,Iter3 Week 2,Iter3 Week 3,,,,Data generation and loading process
+17,Develop SQL analytical queries,Shaobo,Iter3 Week 2,Iter3 Week 3,,,,At least 8 analytical queries: patient counts by urgency average wait times staff workload visit trends repeat patients case ratios resource utilization time-series
+18,Exploratory data analysis,Xiaobai,Iter3 Week 3,Iter3 Week 3,,,,Summary stats and distributions
+19,Create initial visualizations,Xiaobai,Iter3 Week 3,Iter3 Week 3,,,,Time series and correlation plots
+20,Mid-project checkpoint,All,Iter3 Week 3,Iter3 Week 3,,,,Evaluate progress - decide on web app track
+21,Data cleaning and validation,Shaobo,Iter4 Week 1,Iter4 Week 1,,,,Handle missing values validate ranges (HR 40-200 temp 95-105) remove duplicates standardize formats enforce referential integrity
+22,Train classification models,Suk Jin,Iter4 Week 1,Iter4 Week 2,,,,Logistic regression LDA naive Bayes for urgency prediction
+23,Train regression models,Suk Jin,Iter4 Week 1,Iter4 Week 2,,,,Wait time prediction with diagnostics
+24,Train Poisson regression,Suk Jin,Iter4 Week 2,Iter4 Week 2,,,,Daily visit count modeling
+25,Implement business logic,Suk Jin,Iter4 Week 1,Iter4 Week 2,,,,Data validation and integrity checks
+26,Calculate statistical indicators,Suk Jin,Iter4 Week 2,Iter4 Week 3,,,,Conversion rates averages automatic calculations
+27,Model evaluation,All,Iter4 Week 2,Iter4 Week 3,,,,Cross-validation and performance metrics
+28,Model visualizations,Xiaobai,Iter4 Week 2,Iter4 Week 3,,,,Feature importance and prediction plots
+29,Design Flask API endpoints (OPTIONAL),Suk Jin,Iter4 Week 1,Iter4 Week 2,,,,Flask API design receive frontend requests return JSON responses
+29.5,Implement database access layer (OPTIONAL),Suk Jin,Iter4 Week 2,Iter4 Week 3,,,,Backend executes SQL queries on behalf of frontend
+30,Build Flask frontend (OPTIONAL),Xiaobai,Iter4 Week 1,Iter4 Week 3,,,,Web UI with forms calling backend API and chart display
+31,Compile final report,All,Iter5 Week 1,Iter5 Week 1,,,,Methods results recommendations
+32,Format report with figures,Xiaobai,Iter5 Week 1,Iter5 Week 2,,,,Overleaf LaTeX formatting
+33,Create presentation slides,Xiaobai,Iter5 Week 1,Iter5 Week 2,,,,Class presentation materials
+34,Finalize GitHub repository,Suk Jin,Iter5 Week 2,Iter5 Week 2,,,,README documentation code organization
+35,Practice presentation,All,Iter5 Week 2,Iter5 Week 2,,,,Rehearse delivery and timing
+36,Submit final deliverables,Suk Jin,Iter5 Week 2,Iter5 Week 2,,,,Report slides code submission
+37,Present to class,All,Iter5 Week 2,Iter5 Week 2,,,,Class presentation and demo
