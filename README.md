@@ -10,7 +10,7 @@
 
 ## Overview
 
-This project analyzes Emergency Department triage classification and patient flow using a normalized relational database and statistical modeling. Core focus: database design, statistical analysis, and data visualization. Optional stretch goal: interactive web dashboard if time permits.
+This project analyzes Emergency Department triage classification and patient flow using a normalized relational database and statistical modeling. Core focus: database design, statistical analysis, data visualization, and Flask web application development.
 
 ## Objectives
 
@@ -19,8 +19,6 @@ This project analyzes Emergency Department triage classification and patient flo
 2. Develop statistical models for patient urgency classification and wait time prediction
 3. Create data visualizations for hospital administrators
 4. Provide actionable recommendations for resource allocation
-
-**Optional (Stretch):**
 5. Build Flask web application with interactive dashboard
 
 ## Team Roles
@@ -40,9 +38,9 @@ This project analyzes Emergency Department triage classification and patient flo
 - Exploratory analysis visualizations
 - Matplotlib/Seaborn dashboards
 - Presentation materials
-- (Optional) Flask web framework with HTML/CSS
-- (Optional) Web forms that call backend API endpoints
-- (Optional) Display analytical charts and SQL query results from backend API
+- Flask web framework with HTML/CSS
+- Web forms that call backend API endpoints
+- Display analytical charts and SQL query results from backend API
 - **Frontend constraint:** Cannot directly connect to database, must call backend API
 
 **Shaobo Chen - Database Architect:**
