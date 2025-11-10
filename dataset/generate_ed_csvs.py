@@ -92,7 +92,38 @@ PAYOR_NAME_DIST = {
 }
 PAYOR_TYPE_MAP = {"Medicare": "Public","Medicaid":"Public","Blue Cross":"Private","Aetna":"Private",
                   "United":"Private","Cigna":"Private","Self-pay":"Self","Other":"Private"}
-DIAG_CODES = ["R07.9","J06.9","S09.90XA","N39.0","I10"]
+DIAG_CODES = [
+    "R07.9",   # Chest pain
+    "J06.9",   # Acute upper respiratory infection, unspecified
+    "S09.90XA",# Unspecified injury of head, initial encounter
+    "N39.0",   # Urinary tract infection, site not specified
+    "I10",     # Essential (primary) hypertension
+    "E11.9",   # Type 2 diabetes mellitus without complications
+    "M54.5",   # Low back pain
+    "R51.9",   # Headache, unspecified
+    "R50.9",   # Fever, unspecified
+    "J02.9",   # Acute pharyngitis, unspecified
+    "K21.9",   # Gastro-esophageal reflux disease without esophagitis
+    "R11.2",   # Nausea with vomiting, unspecified
+    "J18.9",   # Pneumonia, unspecified organism
+    "K52.9",   # Noninfective gastroenteritis and colitis, unspecified
+    "R42",     # Dizziness and giddiness
+    "R53.1",   # Weakness
+    "R73.9",   # Hyperglycemia, unspecified
+    "R06.02",  # Shortness of breath
+    "R52",     # Pain, unspecified
+    "L03.90",  # Cellulitis, unspecified
+    "S16.1XXA",# Strain of muscle, fascia and tendon at neck level, initial encounter
+    "R10.9",   # Unspecified abdominal pain
+    "K80.20",  # Calculus of gallbladder without cholecystitis without obstruction
+    "R04.0",   # Epistaxis
+    "S82.001A",# Fracture of unspecified patella, initial encounter
+    "R55",     # Syncope and collapse
+    "T78.40XA",# Allergy, unspecified, initial encounter
+    "R41.82",  # Altered mental status, unspecified
+    "R21",     # Rash and other nonspecific skin eruption
+    "R68.89"   # Other general symptoms and signs
+]
 
 ESI_WAIT_MEAN = {1: 5, 2: 15, 3: 45, 4: 90, 5: 120}
 
@@ -244,6 +275,7 @@ def main():
 
     # 7) staff_assignment.csv
     assign_rows = []
+    seen_assignments = set()
     for _, row in df_encounter.iterrows():
         eid = int(row["encounter_id"])
         arr = datetime.strptime(row["arrival_ts"], "%Y-%m-%d %H:%M:%S")
@@ -260,20 +292,28 @@ def main():
             arole = role_map.get(role, "RN")
 
             if (dep - arr).total_seconds() <= 0:
-                assigned_ts = arr
-                released_ts = dep
+                assigned_dt = arr
+                released_dt = dep
             else:
                 start_offset = random.randint(0, max(1, int((dep - arr).total_seconds() // 60) - 5))
                 end_offset = random.randint(start_offset+1, max(start_offset+2, int((dep - arr).total_seconds() // 60)))
-                assigned_ts = arr + timedelta(minutes=start_offset)
-                released_ts = arr + timedelta(minutes=end_offset)
+                assigned_dt = arr + timedelta(minutes=start_offset)
+                released_dt = arr + timedelta(minutes=end_offset)
+
+            key = (eid, sid, arole, assigned_dt)
+            while key in seen_assignments:
+                assigned_dt = assigned_dt + timedelta(seconds=1)
+                released_dt = released_dt + timedelta(seconds=1)
+                key = (eid, sid, arole, assigned_dt)
+
+            seen_assignments.add(key)
 
             assign_rows.append({
                 "encounter_id": eid,
                 "staff_id": sid,
                 "assignment_role": arole,
-                "assigned_ts": dt_to_str(assigned_ts),
-                "released_ts": dt_to_str(released_ts)
+                "assigned_ts": dt_to_str(assigned_dt),
+                "released_ts": dt_to_str(released_dt)
             })
     df_staff_assignment = pd.DataFrame(assign_rows)
 
