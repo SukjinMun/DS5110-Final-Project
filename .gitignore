@@ -28,3 +28,20 @@ Thumbs.db
 # Large CSV files (optional - uncomment if you don't want to commit CSV files)
 # dataset/*.csv
 
+# Jupyter Notebook
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# LaTeX
+*.aux
+*.lof
+*.lot
+*.fls
+*.out
+*.toc
+*.log
+*.synctex.gz
+*.fdb_latexmk
+*.bbl
+*.blg
+
