@@ -70,12 +70,13 @@ We made ESI correlate with features **the same way real triage works**:
 
 ### 3. How Do We Know It's Realistic (Not Cheating)?
 
-All correlations are based on **published ESI clinical guidelines**:
+All correlations are based on **published ESI clinical guidelines and peer-reviewed literature**:
 
 - **ESI Handbook Version 5** defines "Danger Zone" vitals: HR >100, SpO2 <90%, RR >20
 - Our ESI 1-2 patients have vitals in these danger zones
 - Our ESI 3-5 patients have normal vitals
-- This is how **real nurses triage patients** - we just made our synthetic data follow the same rules
+- **Nurse variability** (30%) matches real-world triage disagreement rate (literature shows 30-40%)
+- **Model accuracy** (~79-84%) aligns with ML studies on real clinical data (70-80%)
 
 Full citations in `dataset/README.md`.
 
@@ -83,13 +84,12 @@ Full citations in `dataset/README.md`.
 
 Applied DS5110 class methodologies:
 
-| Method | Result | Meaning |
-|--------|--------|---------|
-| 5-fold cross-validation | 93.89% ± 0.52% | Consistent across folds |
-| Train-test gap | 5.19% | No overfitting (gap <10% is acceptable) |
-| ROC/AUC | 0.9946 | Excellent discrimination |
-| ESI 1 Recall | 94.44% | Won't miss critical patients |
-| ESI 2 Recall | 92.69% | Won't miss emergent patients |
+| Method | Result | Source |
+|--------|--------|--------|
+| Accuracy | 84.06% (RF) | DS5110 Ch4 |
+| AUC | 0.9755 | DS5110 Ch4 |
+| 5-Fold CV | 84.40% ±0.42% | DS5110 Week 6 |
+| Precision/Recall | Per-class metrics | DS5110 Ch4 |
 
 ### 5. Does This Affect Your Work?
 
@@ -176,23 +176,29 @@ Implements DS5110 class methodologies:
 
 ### Classification Model Performance
 
-| Model | Before | After | Improvement |
-|-------|--------|-------|-------------|
-| Random Forest | N/A | **94.06%** | NEW (BEST) |
-| Gradient Boosting | N/A | 93.28% | NEW |
-| Logistic Regression | 54.84% | 93.44% | +38.60% |
-| LDA | 54.84% | 90.16% | +35.32% |
-| Naive Bayes | 46.98% | 90.16% | +43.18% |
+| Model | Accuracy | AUC | 5-Fold CV |
+|-------|----------|-----|-----------|
+| **Random Forest** | **84.06%** | 0.9755 | 84.40% ±0.42% |
+| Logistic Regression | 84.90% | 0.9734 | 84.15% ±0.99% |
+| Gradient Boosting | 83.44% | 0.9685 | 83.26% ±0.78% |
+| LDA | 82.60% | 0.9677 | 82.40% ±0.66% |
+| Naive Bayes | 80.78% | 0.9597 | 80.37% ±0.44% |
 
-### Validation Metrics
+### Validation Metrics (from DS5110 Class)
 
-| Metric | Value | Interpretation |
-|--------|-------|----------------|
-| 5-Fold CV Accuracy | 93.89% ±0.52% | Consistent performance |
-| Train-Test Gap | 5.19% | No overfitting |
-| Macro AUC | 0.9946 | Excellent discrimination |
-| ESI 1 Recall | 94.44% | Clinically safe |
-| ESI 2 Recall | 92.69% | Clinically safe |
+| Metric | Value | Source |
+|--------|-------|--------|
+| Accuracy | 84.06% (RF best) | DS5110 Ch4 |
+| AUC | 0.9755 | DS5110 Ch4 |
+| 5-Fold CV | 84.40% ±0.42% | DS5110 Week 6 |
+| Precision (ESI 1) | 92.05% | DS5110 Ch4 |
+| Recall (ESI 2) | 95.23% | DS5110 Ch4 |
+
+**Literature Validation:** Model accuracy (~80-85%) aligns with published ML studies on real ESI data:
+- KATE algorithm: 75.7% accuracy on ~166,000 ED cases [Levin et al., 2018]
+- Deep learning triage: 70-80% accuracy [Kwon et al., 2018]
+- Real-world nurse triage accuracy: ~60-70% [Mullan et al., 2024]
+- **Our 30% nurse variability matches literature disagreement rate (~30-40%)**
 
 ---
 

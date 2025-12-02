@@ -338,3 +338,40 @@ print(f"     Model is safe for clinical use (won't miss critical patients)")
 print("\n" + "=" * 80)
 print("Validation figures saved to ../figs/")
 print("=" * 80)
+
+# ============================================================================
+# FINAL SUMMARY TABLE (Class/Literature-Supported Metrics Only)
+# ============================================================================
+print("\n" + "=" * 80)
+print("FINAL MODEL COMPARISON (Metrics from DS5110 Class & Literature)")
+print("=" * 80)
+
+print("\n  {:<25} {:>12} {:>12} {:>18}".format("Model", "Accuracy", "AUC", "5-Fold CV"))
+print("  " + "-" * 70)
+
+for name, model in trained_models.items():
+    y_pred = model.predict(X_test_scaled)
+    acc = accuracy_score(y_test, y_pred)
+    auc_val = auc_scores.get(name, 0)
+    cv_mean = cv_results[name].mean()
+    cv_std = cv_results[name].std()
+    print("  {:<25} {:>11.2f}% {:>12.4f} {:>11.2f}% ±{:.2f}%".format(
+        name, acc*100, auc_val, cv_mean*100, cv_std*100))
+
+print("\n  Per-Class Metrics (Random Forest - Best Model):")
+print("  {:<10} {:>12} {:>12} {:>12}".format("ESI Level", "Precision", "Recall", "F1-Score"))
+print("  " + "-" * 50)
+for esi in ['1', '2', '3', '4', '5']:
+    if esi in report:
+        print("  {:<10} {:>11.2f}% {:>11.2f}% {:>11.2f}%".format(
+            f"ESI {esi}",
+            report[esi]['precision']*100,
+            report[esi]['recall']*100,
+            report[esi]['f1-score']*100))
+
+print("\n" + "=" * 80)
+print("These metrics align with DS5110 class materials and cited literature:")
+print("  - Accuracy, AUC, CV: Standard ML evaluation (Ch4, Week 6)")
+print("  - Precision/Recall/F1: Classification metrics (Ch4)")
+print("  - Literature: Levin et al. 2018, Kwon et al. 2018, Ivanov et al. 2021")
+print("=" * 80)

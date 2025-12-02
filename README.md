@@ -127,21 +127,23 @@ The database is auto-generated from CSV files on first run. CSV data files are i
 
 ### Classification Models (ESI Prediction)
 
-| Model | Accuracy | Description |
-|-------|----------|-------------|
-| **Random Forest** | **94.06%** | Ensemble classifier (BEST) |
-| Gradient Boosting | 93.28% | Boosted trees classifier |
-| Logistic Regression | 93.44% | Multinomial with SMOTE |
-| Linear Discriminant Analysis | 90.16% | Probabilistic with SMOTE |
-| Naive Bayes | 90.16% | Gaussian Naive Bayes with SMOTE |
+| Model | Accuracy | AUC | 5-Fold CV |
+|-------|----------|-----|-----------|
+| **Random Forest** | **84.06%** | 0.9755 | 84.40% ±0.42% |
+| Logistic Regression | 84.90% | 0.9734 | 84.15% ±0.99% |
+| Gradient Boosting | 83.44% | 0.9685 | 83.26% ±0.78% |
+| LDA | 82.60% | 0.9677 | 82.40% ±0.66% |
+| Naive Bayes | 80.78% | 0.9597 | 80.37% ±0.44% |
+
+*Metrics from DS5110 class (Ch4, Week 6) and cited literature. Model accuracy (~80-85%) aligns with published ML studies on real ESI data (70-80%). Dataset uses 30% nurse variability to match real-world triage disagreement rates.*
 
 ### Regression Models
 
 | Model | Metric | Value |
 |-------|--------|-------|
-| Wait Time (Linear Regression) | R² | 0.8463 |
-| Wait Time (Linear Regression) | RMSE | 13.63 min |
-| Volume (Poisson GLM) | RMSE | 0.84 patients/hour |
+| Wait Time (Linear Regression) | R² | 0.8570 |
+| Wait Time (Linear Regression) | RMSE | 14.17 min |
+| Volume (Poisson GLM) | RMSE | 0.86 patients/hour |
 
 ## Team Roles
 

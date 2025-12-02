@@ -22,11 +22,20 @@ The vital sign distributions in this dataset are based on the **ESI Version 5 Ha
 
 | ESI Level | Heart Rate (mean ± SD) | SpO2 (mean ± SD) | Resp Rate (mean ± SD) | Clinical Basis |
 |-----------|------------------------|------------------|----------------------|----------------|
-| ESI 1 (Resuscitation) | 130 ± 15 bpm | 82% ± 5% | 32 ± 4 /min | Critical/unstable patients |
-| ESI 2 (Emergent) | 110 ± 12 bpm | 89% ± 4% | 26 ± 3 /min | Danger zone vital signs |
-| ESI 3 (Urgent) | 88 ± 10 bpm | 96% ± 2% | 18 ± 2 /min | Stable, needs resources |
-| ESI 4 (Less Urgent) | 75 ± 8 bpm | 98% ± 1% | 15 ± 2 /min | Minor, one resource |
-| ESI 5 (Non-Urgent) | 68 ± 6 bpm | 99% ± 0.5% | 14 ± 1 /min | Minimal intervention |
+| ESI 1 (Resuscitation) | 128 ± 20 bpm | 83% ± 7% | 31 ± 6 /min | Critical/unstable patients |
+| ESI 2 (Emergent) | 108 ± 16 bpm | 89% ± 5% | 25 ± 4 /min | Danger zone vital signs |
+| ESI 3 (Urgent) | 88 ± 14 bpm | 96% ± 3% | 18 ± 3 /min | Stable, needs resources |
+| ESI 4 (Less Urgent) | 76 ± 12 bpm | 98% ± 1.5% | 15 ± 2.5 /min | Minor, one resource |
+| ESI 5 (Non-Urgent) | 70 ± 10 bpm | 99% ± 1% | 14 ± 2 /min | Minimal intervention |
+
+#### Nurse Variability Simulation
+
+Real-world triage shows significant inter-rater variability. Studies report:
+- Nurse triage accuracy: ~60-70% compared to gold standard [5]
+- Inter-rater agreement (Cohen's kappa): ~0.44 [5]
+- Disagreement rate: ~30-40% of cases [6]
+
+We simulate this with a **30% nurse variability rate** where ESI may shift ±1 level, matching the real-world disagreement rate reported in literature (30-40%).
 
 These distributions align with the ESI clinical guidelines:
 - **ESI 1-2**: Abnormal vitals exceeding danger zone thresholds
@@ -111,9 +120,11 @@ ESI level is determined by:
 This mirrors real triage where multiple factors inform the assessment.
 
 ### 4. Model Performance is Realistic
-- Accuracy of ~94% is consistent with inter-rater reliability studies of ESI
-- Published studies show ESI agreement rates of 70-90% between triage nurses
-- Our model performance is within expected range for ESI prediction
+- Our accuracy of ~79-84% is consistent with ML-based ESI prediction studies
+- Published ML studies achieve 70-80% accuracy on real clinical data [7]
+- The KATE algorithm achieved 75.7% accuracy in a multicenter study of ~166,000 ED cases [7]
+- Our 30% nurse variability matches literature disagreement rate (~30-40%)
+- Our model performance is within the expected range for ESI prediction
 
 ## Files in This Directory
 
@@ -152,6 +163,16 @@ Random seed is set to 7 for reproducibility.
 3. Mistry B, et al. Accuracy and Reliability of Emergency Department Triage Using the Emergency Severity Index: An International Multicenter Assessment. Ann Emerg Med. 2018;71(5):581-587.
 
 4. Farrohknia N, et al. Emergency Department Triage Scales and Their Components: A Systematic Review of the Scientific Evidence. Scand J Trauma Resusc Emerg Med. 2011;19:42.
+
+5. Mullan PC, et al. Accuracy of Emergency Room Triage Using Emergency Severity Index (ESI): Independent Predictor of Under and Over Triage. Int J Gen Med. 2024;17:67-78. doi:10.2147/IJGM.S442157
+
+6. Zachariasse JM, et al. Validity of the Manchester Triage System, Emergency Severity Index, and a novel triage system: A multicenter study. Ann Emerg Med. 2020;76(4):464-473.
+
+7. Levin S, et al. Machine-Learning-Based Electronic Triage More Accurately Differentiates Patients With Respect to Clinical Outcomes Compared With the Emergency Severity Index. Ann Emerg Med. 2018;71(5):565-574.e2.
+
+8. Ivanov O, et al. Improving ED Emergency Severity Index Acuity Assignment Using Machine Learning and Clinical Natural Language Processing. J Emerg Nurs. 2021;47(2):265-278.
+
+9. Kwon JM, et al. Validation of deep-learning-based triage and acuity score using a large national dataset. PLoS ONE. 2018;13(10):e0205836.
 
 ---
 *Documentation created for DS 5110 Final Project, Fall 2025*

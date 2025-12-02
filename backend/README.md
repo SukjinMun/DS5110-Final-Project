@@ -95,11 +95,16 @@ API will be available at `http://localhost:5000`
 ## Statistical Models
 
 ### Classification Models (`models/classifiers.py`)
-- **Random Forest**: Ensemble classifier for ESI levels (BEST - 94.06% accuracy)
-- **Gradient Boosting**: Boosted trees classifier (93.28% accuracy)
-- **Logistic Regression**: Multi-class classification with SMOTE (93.44% accuracy)
-- **Linear Discriminant Analysis (LDA)**: Probabilistic classification with SMOTE (90.16% accuracy)
-- **Naive Bayes**: Gaussian Naive Bayes with SMOTE (90.16% accuracy)
+
+| Model | Accuracy | AUC | 5-Fold CV |
+|-------|----------|-----|-----------|
+| **Random Forest** | **84.06%** | 0.9755 | 84.40% ±0.42% |
+| Logistic Regression | 84.90% | 0.9734 | 84.15% ±0.99% |
+| Gradient Boosting | 83.44% | 0.9685 | 83.26% ±0.78% |
+| LDA | 82.60% | 0.9677 | 82.40% ±0.66% |
+| Naive Bayes | 80.78% | 0.9597 | 80.37% ±0.44% |
+
+*Metrics from DS5110 class (Ch4, Week 6). Accuracy (~80-85%) aligns with published ML studies on real ESI data (70-80%). 30% nurse variability matches real-world triage disagreement.*
 
 **Usage:**
 ```python
@@ -153,9 +158,9 @@ See `../db_setup.sql` for complete schema.
 - ✅ Integration with frontend
 
 ### Model Performance
-- **Best Classification Accuracy:** 94.06% (Random Forest)
-- **Wait Time R²:** 0.8463
-- **Volume RMSE:** 0.84 patients/hour
+- **Best Classification Accuracy:** 84.06% (Random Forest), AUC: 0.9755
+- **Wait Time R²:** 0.8570
+- **Volume RMSE:** 0.86 patients/hour
 
 ## Notes
 

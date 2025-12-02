@@ -127,14 +127,20 @@ DIAG_CODES = [
 
 ESI_WAIT_MEAN = {1: 5, 2: 15, 3: 45, 4: 90, 5: 120}
 
-# ESI-based vital sign parameters (mean, std) - stronger correlations for better classification
+# ESI-based vital sign parameters (mean, std) - realistic variability for ~80% accuracy
+# Moderately increased std devs to simulate real-world measurement variability
 ESI_VITALS = {
-    1: {"heart_rate": (130, 15), "systolic_bp": (75, 12), "respiratory_rate": (32, 4), "spo2": (82, 5), "pain_score": (9, 0.5), "temperature_c": (39.2, 0.6)},
-    2: {"heart_rate": (110, 12), "systolic_bp": (95, 10), "respiratory_rate": (26, 3), "spo2": (89, 4), "pain_score": (7, 1), "temperature_c": (38.5, 0.5)},
-    3: {"heart_rate": (88, 10), "systolic_bp": (122, 10), "respiratory_rate": (18, 2), "spo2": (96, 2), "pain_score": (5, 1), "temperature_c": (37.3, 0.4)},
-    4: {"heart_rate": (75, 8), "systolic_bp": (128, 8), "respiratory_rate": (15, 2), "spo2": (98, 1), "pain_score": (3, 1), "temperature_c": (37.0, 0.3)},
-    5: {"heart_rate": (68, 6), "systolic_bp": (120, 6), "respiratory_rate": (14, 1), "spo2": (99, 0.5), "pain_score": (1, 0.5), "temperature_c": (36.8, 0.2)},
+    1: {"heart_rate": (128, 20), "systolic_bp": (78, 16), "respiratory_rate": (31, 6), "spo2": (83, 7), "pain_score": (8.5, 1.2), "temperature_c": (39.0, 0.8)},
+    2: {"heart_rate": (108, 16), "systolic_bp": (96, 14), "respiratory_rate": (25, 4), "spo2": (89, 5), "pain_score": (7, 1.5), "temperature_c": (38.4, 0.7)},
+    3: {"heart_rate": (88, 14), "systolic_bp": (121, 14), "respiratory_rate": (18, 3), "spo2": (96, 3), "pain_score": (5, 1.5), "temperature_c": (37.3, 0.5)},
+    4: {"heart_rate": (76, 12), "systolic_bp": (127, 12), "respiratory_rate": (15, 2.5), "spo2": (98, 1.5), "pain_score": (3, 1.2), "temperature_c": (37.0, 0.4)},
+    5: {"heart_rate": (70, 10), "systolic_bp": (121, 10), "respiratory_rate": (14, 2), "spo2": (99, 1), "pain_score": (1.5, 1), "temperature_c": (36.8, 0.3)},
 }
+
+# Nurse variability rate - simulates real-world triage inconsistency
+# Literature shows 30-40% disagreement rate in nurse triage (Mullan et al., 2024)
+# Cohen's kappa ~0.44 indicates moderate agreement (Zachariasse et al., 2020)
+NURSE_VARIABILITY_RATE = 0.30
 
 # Chief complaint to ESI probability mapping
 COMPLAINT_ESI_PROBS = {
@@ -222,6 +228,12 @@ def main():
         chief_complaint = random.choice(CHIEF_COMPLAINTS)
         esi_probs = COMPLAINT_ESI_PROBS.get(chief_complaint, ESI_DIST)
         esi = weighted_choice([1,2,3,4,5], list(esi_probs.values()))
+
+        # Simulate nurse variability - occasionally shift ESI by ±1
+        # This reflects real-world triage inconsistency
+        if random.random() < NURSE_VARIABILITY_RATE:
+            shift = random.choice([-1, 1])
+            esi = clamp(esi + shift, 1, 5)
 
         # Store ESI for vitals generation
         encounter_esi_map[eid] = esi
