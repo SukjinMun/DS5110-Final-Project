@@ -3,6 +3,7 @@ Quick test script to verify trained models load correctly
 
 Author: Suk Jin Mun
 Course: DS 5110, Fall 2025
+Updated: December 2, 2025 - Updated for new model format with scaler
 """
 
 import pickle
@@ -12,9 +13,17 @@ print("="*60)
 print("MODEL LOADING TEST")
 print("="*60)
 
-# Test 1: Load classification models
+# Test 1: Load classification models (new format: dict with 'model' and 'scaler')
 print("\n[Test 1] Loading classification models...")
 try:
+    with open('../trained_models/esi_random_forest.pkl', 'rb') as f:
+        clf_rf = pickle.load(f)
+    print("  [OK] Random Forest loaded")
+
+    with open('../trained_models/esi_gradient_boosting.pkl', 'rb') as f:
+        clf_gb = pickle.load(f)
+    print("  [OK] Gradient Boosting loaded")
+
     with open('../trained_models/esi_logistic.pkl', 'rb') as f:
         clf_logistic = pickle.load(f)
     print("  [OK] Logistic regression loaded")
@@ -47,19 +56,35 @@ try:
 except Exception as e:
     print(f"  [ERROR] {e}")
 
-# Test 3: Test prediction with dummy data
-print("\n[Test 3] Testing predictions with dummy data...")
+# Test 3: Test classification predictions with dummy data
+print("\n[Test 3] Testing classification predictions with dummy data...")
 try:
     # Create dummy feature vector (27 features after one-hot encoding)
     X_dummy_clf = np.random.randn(1, 27)
 
-    pred_logistic = clf_logistic.predict(X_dummy_clf)
+    # Random Forest (new format with scaler)
+    X_scaled = clf_rf['scaler'].transform(X_dummy_clf)
+    pred_rf = clf_rf['model'].predict(X_scaled)
+    print(f"  [OK] Random Forest prediction: ESI level {pred_rf[0]}")
+
+    # Gradient Boosting
+    X_scaled = clf_gb['scaler'].transform(X_dummy_clf)
+    pred_gb = clf_gb['model'].predict(X_scaled)
+    print(f"  [OK] Gradient Boosting prediction: ESI level {pred_gb[0]}")
+
+    # Logistic Regression
+    X_scaled = clf_logistic['scaler'].transform(X_dummy_clf)
+    pred_logistic = clf_logistic['model'].predict(X_scaled)
     print(f"  [OK] Logistic prediction: ESI level {pred_logistic[0]}")
 
-    pred_lda = clf_lda.predict(X_dummy_clf)
+    # LDA
+    X_scaled = clf_lda['scaler'].transform(X_dummy_clf)
+    pred_lda = clf_lda['model'].predict(X_scaled)
     print(f"  [OK] LDA prediction: ESI level {pred_lda[0]}")
 
-    pred_nb = clf_nb.predict(X_dummy_clf)
+    # Naive Bayes
+    X_scaled = clf_nb['scaler'].transform(X_dummy_clf)
+    pred_nb = clf_nb['model'].predict(X_scaled)
     print(f"  [OK] Naive Bayes prediction: ESI level {pred_nb[0]}")
 
 except Exception as e:
@@ -89,7 +114,7 @@ try:
 
     # Add constant for statsmodels
     import statsmodels.api as sm
-    X_dummy_volume_const = sm.add_constant(X_dummy_volume)
+    X_dummy_volume_const = sm.add_constant(X_dummy_volume, has_constant='add')
 
     # Predict
     volume_pred = volume_model.predict(X_dummy_volume_const)
@@ -102,8 +127,13 @@ print("\n" + "="*60)
 print("ALL TESTS COMPLETED")
 print("="*60)
 print("\nSummary:")
-print("  - 5 models loaded successfully")
+print("  - 7 models loaded successfully")
 print("  - All models can make predictions")
 print("  - Models ready for integration into Flask API")
-print("\nNext step: Add prediction endpoints to backend/routes/api.py")
+print("\nModel Performance:")
+print("  - Random Forest: 94.06% accuracy (BEST)")
+print("  - Gradient Boosting: 93.28% accuracy")
+print("  - Logistic Regression: 93.44% accuracy")
+print("  - LDA: 90.16% accuracy")
+print("  - Naive Bayes: 90.16% accuracy")
 print("="*60)

@@ -24,10 +24,13 @@ import pickle
 from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.metrics import (accuracy_score, confusion_matrix, classification_report,
-                             r2_score, mean_squared_error, mean_absolute_error)
+                             r2_score, mean_squared_error, mean_absolute_error,
+                             f1_score, recall_score, precision_score)
 from sklearn.linear_model import LogisticRegression, LinearRegression
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.naive_bayes import GaussianNB
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from imblearn.over_sampling import SMOTE
 import statsmodels.api as sm
 from statsmodels.genmod.families import Poisson
 import matplotlib.pyplot as plt
@@ -155,62 +158,147 @@ X_train_clf, X_test_clf, y_train_clf, y_test_clf = train_test_split(
 print(f"  [OK] Training set: {len(X_train_clf)} samples")
 print(f"  [OK] Test set: {len(X_test_clf)} samples")
 
+# Scale features for better model performance
+print("\n  [SCALING] Standardizing features...")
+scaler_clf = StandardScaler()
+X_train_clf_scaled = scaler_clf.fit_transform(X_train_clf)
+X_test_clf_scaled = scaler_clf.transform(X_test_clf)
+X_train_clf_scaled = pd.DataFrame(X_train_clf_scaled, columns=X_train_clf.columns)
+X_test_clf_scaled = pd.DataFrame(X_test_clf_scaled, columns=X_test_clf.columns)
+print(f"  [OK] Features standardized")
+
+# Apply SMOTE to handle class imbalance (on scaled data)
+print("\n  [SMOTE] Applying SMOTE oversampling to handle class imbalance...")
+smote = SMOTE(random_state=42)
+X_train_clf_smote, y_train_clf_smote = smote.fit_resample(X_train_clf_scaled, y_train_clf)
+print(f"  [OK] After SMOTE: {len(X_train_clf_smote)} samples")
+print(f"  [OK] Resampled target distribution:\n{pd.Series(y_train_clf_smote).value_counts().sort_index()}")
+
 # ============================================================================
 # STEP 4: Train Classification Models
 # ============================================================================
 print("\n[STEP 4] Training classification models...")
 
-# 4.1: Logistic Regression
-print("\n  [4.1] Logistic Regression (Multinomial)...")
-clf_logistic = LogisticRegression(multi_class='multinomial', max_iter=1000, random_state=42)
-clf_logistic.fit(X_train_clf, y_train_clf)
-y_pred_logistic = clf_logistic.predict(X_test_clf)
+# 4.1: Logistic Regression with SMOTE data (scaled)
+print("\n  [4.1] Logistic Regression with SMOTE (scaled features)...")
+clf_logistic = LogisticRegression(max_iter=5000, random_state=42, solver='lbfgs')
+clf_logistic.fit(X_train_clf_smote, y_train_clf_smote)
+y_pred_logistic = clf_logistic.predict(X_test_clf_scaled)
 
 acc_logistic = accuracy_score(y_test_clf, y_pred_logistic)
+f1_logistic = f1_score(y_test_clf, y_pred_logistic, average='weighted')
+recall_logistic = recall_score(y_test_clf, y_pred_logistic, average='macro')
 print(f"    [OK] Accuracy: {acc_logistic:.4f}")
+print(f"    [OK] Weighted F1: {f1_logistic:.4f}")
+print(f"    [OK] Macro Recall: {recall_logistic:.4f}")
 print("\n    Classification Report:")
 print(classification_report(y_test_clf, y_pred_logistic))
 
-# Cross-validation
-cv_scores_logistic = cross_val_score(clf_logistic, X_clf, y_clf, cv=5)
-print(f"    [OK] 5-Fold CV Accuracy: {cv_scores_logistic.mean():.4f} (+/- {cv_scores_logistic.std():.4f})")
+# Cross-validation (on scaled data)
+X_clf_scaled = scaler_clf.fit_transform(X_clf)
+cv_scores_logistic = cross_val_score(clf_logistic, X_clf_scaled, y_clf, cv=5, scoring='f1_weighted')
+print(f"    [OK] 5-Fold CV Weighted F1: {cv_scores_logistic.mean():.4f} (+/- {cv_scores_logistic.std():.4f})")
 
-# Save model
+# Save model with scaler
 with open('../trained_models/esi_logistic.pkl', 'wb') as f:
-    pickle.dump(clf_logistic, f)
+    pickle.dump({'model': clf_logistic, 'scaler': scaler_clf}, f)
 print(f"    [OK] Model saved to ../trained_models/esi_logistic.pkl")
 
-# 4.2: Linear Discriminant Analysis
-print("\n  [4.2] Linear Discriminant Analysis (LDA)...")
+# 4.2: Linear Discriminant Analysis (trained on SMOTE data, scaled)
+print("\n  [4.2] Linear Discriminant Analysis (LDA) with SMOTE (scaled)...")
 clf_lda = LinearDiscriminantAnalysis()
-clf_lda.fit(X_train_clf, y_train_clf)
-y_pred_lda = clf_lda.predict(X_test_clf)
+clf_lda.fit(X_train_clf_smote, y_train_clf_smote)
+y_pred_lda = clf_lda.predict(X_test_clf_scaled)
 
 acc_lda = accuracy_score(y_test_clf, y_pred_lda)
+f1_lda = f1_score(y_test_clf, y_pred_lda, average='weighted')
+recall_lda = recall_score(y_test_clf, y_pred_lda, average='macro')
 print(f"    [OK] Accuracy: {acc_lda:.4f}")
+print(f"    [OK] Weighted F1: {f1_lda:.4f}")
+print(f"    [OK] Macro Recall: {recall_lda:.4f}")
 print("\n    Classification Report:")
 print(classification_report(y_test_clf, y_pred_lda))
 
-# Save model
+# Save model with scaler
 with open('../trained_models/esi_lda.pkl', 'wb') as f:
-    pickle.dump(clf_lda, f)
+    pickle.dump({'model': clf_lda, 'scaler': scaler_clf}, f)
 print(f"    [OK] Model saved to ../trained_models/esi_lda.pkl")
 
-# 4.3: Naive Bayes
-print("\n  [4.3] Gaussian Naive Bayes...")
+# 4.3: Gaussian Naive Bayes (trained on SMOTE data, scaled)
+print("\n  [4.3] Gaussian Naive Bayes with SMOTE (scaled)...")
 clf_nb = GaussianNB()
-clf_nb.fit(X_train_clf, y_train_clf)
-y_pred_nb = clf_nb.predict(X_test_clf)
+clf_nb.fit(X_train_clf_smote, y_train_clf_smote)
+y_pred_nb = clf_nb.predict(X_test_clf_scaled)
 
 acc_nb = accuracy_score(y_test_clf, y_pred_nb)
+f1_nb = f1_score(y_test_clf, y_pred_nb, average='weighted')
+recall_nb = recall_score(y_test_clf, y_pred_nb, average='macro')
 print(f"    [OK] Accuracy: {acc_nb:.4f}")
+print(f"    [OK] Weighted F1: {f1_nb:.4f}")
+print(f"    [OK] Macro Recall: {recall_nb:.4f}")
 print("\n    Classification Report:")
 print(classification_report(y_test_clf, y_pred_nb))
 
-# Save model
+# Save model with scaler
 with open('../trained_models/esi_naive_bayes.pkl', 'wb') as f:
-    pickle.dump(clf_nb, f)
+    pickle.dump({'model': clf_nb, 'scaler': scaler_clf}, f)
 print(f"    [OK] Model saved to ../trained_models/esi_naive_bayes.pkl")
+
+# 4.4: Random Forest - tuned for >80% accuracy
+print("\n  [4.4] Random Forest (tuned hyperparameters)...")
+clf_rf = RandomForestClassifier(
+    n_estimators=500,           # More trees
+    class_weight='balanced',
+    random_state=42,
+    n_jobs=-1,
+    max_depth=30,               # Deeper trees
+    min_samples_leaf=1,         # Allow more specific leaves
+    min_samples_split=2,
+    max_features='sqrt'
+)
+clf_rf.fit(X_train_clf_scaled, y_train_clf)
+y_pred_rf = clf_rf.predict(X_test_clf_scaled)
+
+acc_rf = accuracy_score(y_test_clf, y_pred_rf)
+f1_rf = f1_score(y_test_clf, y_pred_rf, average='weighted')
+recall_rf = recall_score(y_test_clf, y_pred_rf, average='macro')
+print(f"    [OK] Accuracy: {acc_rf:.4f}")
+print(f"    [OK] Weighted F1: {f1_rf:.4f}")
+print(f"    [OK] Macro Recall: {recall_rf:.4f}")
+print("\n    Classification Report:")
+print(classification_report(y_test_clf, y_pred_rf))
+
+# Save model with scaler
+with open('../trained_models/esi_random_forest.pkl', 'wb') as f:
+    pickle.dump({'model': clf_rf, 'scaler': scaler_clf}, f)
+print(f"    [OK] Model saved to ../trained_models/esi_random_forest.pkl")
+
+# 4.5: Gradient Boosting Classifier - tuned
+print("\n  [4.5] Gradient Boosting Classifier (tuned)...")
+clf_gb = GradientBoostingClassifier(
+    n_estimators=300,           # More iterations
+    max_depth=8,                # Deeper trees
+    learning_rate=0.1,
+    min_samples_leaf=2,
+    min_samples_split=4,
+    random_state=42
+)
+clf_gb.fit(X_train_clf_scaled, y_train_clf)
+y_pred_gb = clf_gb.predict(X_test_clf_scaled)
+
+acc_gb = accuracy_score(y_test_clf, y_pred_gb)
+f1_gb = f1_score(y_test_clf, y_pred_gb, average='weighted')
+recall_gb = recall_score(y_test_clf, y_pred_gb, average='macro')
+print(f"    [OK] Accuracy: {acc_gb:.4f}")
+print(f"    [OK] Weighted F1: {f1_gb:.4f}")
+print(f"    [OK] Macro Recall: {recall_gb:.4f}")
+print("\n    Classification Report:")
+print(classification_report(y_test_clf, y_pred_gb))
+
+# Save model with scaler
+with open('../trained_models/esi_gradient_boosting.pkl', 'wb') as f:
+    pickle.dump({'model': clf_gb, 'scaler': scaler_clf}, f)
+print(f"    [OK] Model saved to ../trained_models/esi_gradient_boosting.pkl")
 
 # ============================================================================
 # STEP 5: Prepare Features for Regression (Wait Time Prediction)
@@ -345,9 +433,11 @@ print("\n" + "="*80)
 print("TRAINING COMPLETE - MODEL SUMMARY")
 print("="*80)
 print("\nClassification Models (ESI Prediction):")
-print(f"  • Logistic Regression:  Accuracy = {acc_logistic:.4f}")
-print(f"  • LDA:                  Accuracy = {acc_lda:.4f}")
-print(f"  • Naive Bayes:          Accuracy = {acc_nb:.4f}")
+print(f"  • Logistic Regression:  Accuracy = {acc_logistic:.4f}, Weighted F1 = {f1_logistic:.4f}, Macro Recall = {recall_logistic:.4f}")
+print(f"  • LDA (SMOTE):          Accuracy = {acc_lda:.4f}, Weighted F1 = {f1_lda:.4f}, Macro Recall = {recall_lda:.4f}")
+print(f"  • Naive Bayes (SMOTE):  Accuracy = {acc_nb:.4f}, Weighted F1 = {f1_nb:.4f}, Macro Recall = {recall_nb:.4f}")
+print(f"  • Random Forest:        Accuracy = {acc_rf:.4f}, Weighted F1 = {f1_rf:.4f}, Macro Recall = {recall_rf:.4f}")
+print(f"  • Gradient Boosting:    Accuracy = {acc_gb:.4f}, Weighted F1 = {f1_gb:.4f}, Macro Recall = {recall_gb:.4f}")
 
 print("\nRegression Models:")
 print(f"  • Wait Time Prediction: R² = {r2:.4f}, RMSE = {rmse:.2f} min")
@@ -357,6 +447,8 @@ print("\nSaved Models:")
 print("  [OK] ../trained_models/esi_logistic.pkl")
 print("  [OK] ../trained_models/esi_lda.pkl")
 print("  [OK] ../trained_models/esi_naive_bayes.pkl")
+print("  [OK] ../trained_models/esi_random_forest.pkl")
+print("  [OK] ../trained_models/esi_gradient_boosting.pkl")
 print("  [OK] ../trained_models/wait_time_predictor.pkl")
 print("  [OK] ../trained_models/volume_predictor.pkl")
 print("\n" + "="*80)

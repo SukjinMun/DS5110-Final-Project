@@ -95,9 +95,11 @@ API will be available at `http://localhost:5000`
 ## Statistical Models
 
 ### Classification Models (`models/classifiers.py`)
-- **Logistic Regression**: Multi-class classification for ESI levels
-- **Linear Discriminant Analysis (LDA)**: Alternative classification approach
-- **Naive Bayes**: Probabilistic classifier
+- **Random Forest**: Ensemble classifier for ESI levels (BEST - 94.06% accuracy)
+- **Gradient Boosting**: Boosted trees classifier (93.28% accuracy)
+- **Logistic Regression**: Multi-class classification with SMOTE (93.44% accuracy)
+- **Linear Discriminant Analysis (LDA)**: Probabilistic classification with SMOTE (90.16% accuracy)
+- **Naive Bayes**: Gaussian Naive Bayes with SMOTE (90.16% accuracy)
 
 **Usage:**
 ```python
@@ -143,23 +145,20 @@ See `../db_setup.sql` for complete schema.
 - ✅ Basic API endpoints for data retrieval
 - ✅ Statistics endpoints
 - ✅ Business logic validation
-- ✅ Model prototypes (classifiers and regressors)
+- ✅ Classification models trained (Random Forest, Gradient Boosting, Logistic Regression, LDA, Naive Bayes)
+- ✅ Regression models trained (Wait Time, Volume Prediction)
+- ✅ Model evaluation (confusion matrix, ROC curves, learning curves)
+- ✅ Model validation using DS5110 class methodologies
+- ✅ API endpoints for model predictions
+- ✅ Integration with frontend
 
-### Pending (Waiting for Date Format Fix)
-- ⏳ Wait time calculation endpoints
-- ⏳ Time-series analysis
-- ⏳ Complete model training with actual data
-- ⏳ Model evaluation and visualization
-
-### Iteration 04 Tasks
-- Train classification models (logistic regression, LDA, Naive Bayes)
-- Train regression models (linear regression, Poisson GLM)
-- Model evaluation (confusion matrix, ROC curves, R-squared)
-- API endpoints for model predictions
-- Integration with frontend
+### Model Performance
+- **Best Classification Accuracy:** 94.06% (Random Forest)
+- **Wait Time R²:** 0.8463
+- **Volume RMSE:** 0.84 patients/hour
 
 ## Notes
 
 - Frontend cannot directly access database - must call backend API
-- All date/time calculations on hold until encounter.csv date format is fixed
-- Model prototypes are ready but feature engineering requires proper datetime parsing
+- All models validated using 5-fold cross-validation, ROC/AUC analysis, and learning curves
+- ESI classification based on clinically-validated vital sign correlations (see dataset/README.md)

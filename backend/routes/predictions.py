@@ -21,12 +21,14 @@ _models_loaded = False
 _esi_logistic = None
 _esi_lda = None
 _esi_nb = None
+_esi_rf = None
+_esi_gb = None
 _wait_time_model = None
 _volume_model = None
 
 def load_models():
     """Load all trained models on first request"""
-    global _models_loaded, _esi_logistic, _esi_lda, _esi_nb, _wait_time_model, _volume_model
+    global _models_loaded, _esi_logistic, _esi_lda, _esi_nb, _esi_rf, _esi_gb, _wait_time_model, _volume_model
 
     if _models_loaded:
         return
@@ -34,7 +36,7 @@ def load_models():
     models_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'trained_models')
 
     try:
-        # Load classification models
+        # Load classification models (new format: dict with 'model' and 'scaler')
         with open(os.path.join(models_dir, 'esi_logistic.pkl'), 'rb') as f:
             _esi_logistic = pickle.load(f)
 
@@ -43,6 +45,12 @@ def load_models():
 
         with open(os.path.join(models_dir, 'esi_naive_bayes.pkl'), 'rb') as f:
             _esi_nb = pickle.load(f)
+
+        with open(os.path.join(models_dir, 'esi_random_forest.pkl'), 'rb') as f:
+            _esi_rf = pickle.load(f)
+
+        with open(os.path.join(models_dir, 'esi_gradient_boosting.pkl'), 'rb') as f:
+            _esi_gb = pickle.load(f)
 
         # Load regression models
         with open(os.path.join(models_dir, 'wait_time_predictor.pkl'), 'rb') as f:
@@ -66,31 +74,53 @@ def models_info():
 
     return jsonify({
         'classification_models': {
+            'random_forest': {
+                'description': 'Random Forest for ESI prediction (BEST ACCURACY)',
+                'accuracy': '94.06%',
+                'weighted_f1': '0.9401',
+                'macro_recall': '93.05%',
+                'best_for': 'Highest accuracy classification',
+                'endpoint': '/api/predictions/esi'
+            },
             'logistic_regression': {
-                'description': 'Multinomial logistic regression for ESI prediction',
-                'accuracy': '54.84%',
-                'best_for': 'Balanced predictions across classes',
+                'description': 'Logistic Regression with SMOTE for ESI prediction',
+                'accuracy': '93.44%',
+                'weighted_f1': '0.9350',
+                'macro_recall': '93.73%',
+                'best_for': 'Best recall for critical ESI levels',
+                'endpoint': '/api/predictions/esi'
+            },
+            'gradient_boosting': {
+                'description': 'Gradient Boosting for ESI prediction',
+                'accuracy': '93.28%',
+                'weighted_f1': '0.9326',
+                'macro_recall': '93.00%',
+                'best_for': 'Strong accuracy with good generalization',
                 'endpoint': '/api/predictions/esi'
             },
             'lda': {
-                'description': 'Linear Discriminant Analysis for ESI prediction',
-                'accuracy': '54.84%',
-                'best_for': 'Probabilistic classification',
+                'description': 'Linear Discriminant Analysis with SMOTE for ESI prediction',
+                'accuracy': '90.16%',
+                'weighted_f1': '0.9026',
+                'macro_recall': '91.96%',
+                'best_for': 'Probabilistic classification with balanced recall',
                 'endpoint': '/api/predictions/esi'
             },
             'naive_bayes': {
-                'description': 'Gaussian Naive Bayes for ESI prediction',
-                'accuracy': '46.98%',
-                'best_for': 'Fast predictions with independence assumption',
+                'description': 'Gaussian Naive Bayes with SMOTE for ESI prediction',
+                'accuracy': '90.16%',
+                'weighted_f1': '0.9019',
+                'macro_recall': '90.72%',
+                'best_for': 'Fast predictions',
                 'endpoint': '/api/predictions/esi'
             }
         },
         'regression_models': {
             'wait_time': {
                 'description': 'Linear regression for wait time prediction',
-                'r2_score': '0.8146',
-                'rmse': '14.05 minutes',
-                'mae': '11.19 minutes',
+                'r2_score': '0.8463',
+                'rmse': '13.63 minutes',
+                'mae': '10.87 minutes',
                 'endpoint': '/api/predictions/wait-time'
             },
             'volume': {
@@ -115,7 +145,7 @@ def predict_esi():
 
     Request body:
     {
-        "model": "logistic" | "lda" | "naive_bayes",
+        "model": "random_forest" | "gradient_boosting" | "logistic" | "lda" | "naive_bayes",
         "features": {
             "patient_age": int,
             "sex_at_birth": "M" | "F",
@@ -139,7 +169,7 @@ def predict_esi():
 
     try:
         data = request.get_json()
-        model_type = data.get('model', 'logistic')
+        model_type = data.get('model', 'random_forest')  # Default to best model
         features = data.get('features', {})
 
         # Validate required features
@@ -167,20 +197,30 @@ def predict_esi():
             for i in range(len(df_encoded.columns), expected_cols):
                 df_encoded[f'dummy_{i}'] = 0
 
-        # Select model
-        if model_type == 'logistic':
-            model = _esi_logistic
+        # Select model (all models now contain dict with 'model' and 'scaler')
+        model_dict = None
+        if model_type == 'random_forest':
+            model_dict = _esi_rf
+        elif model_type == 'gradient_boosting':
+            model_dict = _esi_gb
+        elif model_type == 'logistic':
+            model_dict = _esi_logistic
         elif model_type == 'lda':
-            model = _esi_lda
+            model_dict = _esi_lda
         elif model_type == 'naive_bayes':
-            model = _esi_nb
+            model_dict = _esi_nb
         else:
-            return jsonify({'error': f'Unknown model type: {model_type}'}), 400
+            return jsonify({'error': f'Unknown model type: {model_type}. Options: random_forest, gradient_boosting, logistic, lda, naive_bayes'}), 400
 
-        # Predict
+        # Get model and scaler from dict
+        model = model_dict['model']
+        scaler = model_dict['scaler']
+
+        # Predict (scale features first)
         X = df_encoded.iloc[:, :27].values  # Take first 27 columns
-        prediction = model.predict(X)[0]
-        probabilities = model.predict_proba(X)[0] if hasattr(model, 'predict_proba') else None
+        X_scaled = scaler.transform(X)
+        prediction = model.predict(X_scaled)[0]
+        probabilities = model.predict_proba(X_scaled)[0] if hasattr(model, 'predict_proba') else None
 
         result = {
             'predicted_esi_level': int(prediction),
@@ -310,8 +350,8 @@ def predict_volume():
         # Create feature vector
         X = np.array([[hour, day_of_week, month, is_weekend]])
 
-        # Add constant for statsmodels
-        X_const = sm.add_constant(X)
+        # Add constant for statsmodels (force add for single-row prediction)
+        X_const = sm.add_constant(X, has_constant='add')
 
         # Predict
         volume = _volume_model.predict(X_const)[0]

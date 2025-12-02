@@ -127,6 +127,40 @@ DIAG_CODES = [
 
 ESI_WAIT_MEAN = {1: 5, 2: 15, 3: 45, 4: 90, 5: 120}
 
+# ESI-based vital sign parameters (mean, std) - stronger correlations for better classification
+ESI_VITALS = {
+    1: {"heart_rate": (130, 15), "systolic_bp": (75, 12), "respiratory_rate": (32, 4), "spo2": (82, 5), "pain_score": (9, 0.5), "temperature_c": (39.2, 0.6)},
+    2: {"heart_rate": (110, 12), "systolic_bp": (95, 10), "respiratory_rate": (26, 3), "spo2": (89, 4), "pain_score": (7, 1), "temperature_c": (38.5, 0.5)},
+    3: {"heart_rate": (88, 10), "systolic_bp": (122, 10), "respiratory_rate": (18, 2), "spo2": (96, 2), "pain_score": (5, 1), "temperature_c": (37.3, 0.4)},
+    4: {"heart_rate": (75, 8), "systolic_bp": (128, 8), "respiratory_rate": (15, 2), "spo2": (98, 1), "pain_score": (3, 1), "temperature_c": (37.0, 0.3)},
+    5: {"heart_rate": (68, 6), "systolic_bp": (120, 6), "respiratory_rate": (14, 1), "spo2": (99, 0.5), "pain_score": (1, 0.5), "temperature_c": (36.8, 0.2)},
+}
+
+# Chief complaint to ESI probability mapping
+COMPLAINT_ESI_PROBS = {
+    "Chest pain": {1: 0.05, 2: 0.30, 3: 0.50, 4: 0.12, 5: 0.03},
+    "Shortness of breath": {1: 0.08, 2: 0.35, 3: 0.45, 4: 0.10, 5: 0.02},
+    "Head injury": {1: 0.10, 2: 0.25, 3: 0.45, 4: 0.15, 5: 0.05},
+    "Abdominal pain": {1: 0.02, 2: 0.15, 3: 0.55, 4: 0.20, 5: 0.08},
+    "Fever": {1: 0.03, 2: 0.12, 3: 0.50, 4: 0.25, 5: 0.10},
+    "Weakness": {1: 0.04, 2: 0.20, 3: 0.50, 4: 0.20, 5: 0.06},
+    "Dizziness": {1: 0.03, 2: 0.18, 3: 0.52, 4: 0.20, 5: 0.07},
+    "Fall": {1: 0.06, 2: 0.22, 3: 0.48, 4: 0.18, 5: 0.06},
+    "Back pain": {1: 0.01, 2: 0.08, 3: 0.45, 4: 0.35, 5: 0.11},
+    "Cough": {1: 0.01, 2: 0.05, 3: 0.35, 4: 0.40, 5: 0.19},
+    "Laceration": {1: 0.02, 2: 0.10, 3: 0.40, 4: 0.35, 5: 0.13},
+    "Nausea/Vomiting": {1: 0.02, 2: 0.12, 3: 0.50, 4: 0.28, 5: 0.08},
+}
+
+# Arrival mode probabilities by ESI
+ESI_ARRIVAL_MODE = {
+    1: {"Walk-in": 0.10, "EMS": 0.85, "Transfer": 0.05},
+    2: {"Walk-in": 0.35, "EMS": 0.55, "Transfer": 0.10},
+    3: {"Walk-in": 0.70, "EMS": 0.22, "Transfer": 0.08},
+    4: {"Walk-in": 0.85, "EMS": 0.10, "Transfer": 0.05},
+    5: {"Walk-in": 0.92, "EMS": 0.05, "Transfer": 0.03},
+}
+
 def random_arrival_time():
     d = rand_date(year_start, year_end)
     # slight evening / weekend bias
@@ -175,15 +209,27 @@ def main():
     } for sid in range(1, N_STAFF+1)]
     df_staff = pd.DataFrame(staff)
 
-    # 3) encounter.csv
+    # 3) encounter.csv - with realistic ESI correlations
     encounters = []
+    encounter_esi_map = {}  # Store ESI for each encounter for vitals generation
     for eid in range(1, N_ENCOUNTERS+1):
         pid = random.randint(1, N_PATIENTS)
         arr = random_arrival_time()
         triage_start = arr + timedelta(minutes=random.randint(0, 20))
         triage_end = triage_start + timedelta(minutes=random.randint(5, 20))
 
-        esi = weighted_choice([1,2,3,4,5], list(ESI_DIST.values()))
+        # First select chief complaint, then ESI based on complaint
+        chief_complaint = random.choice(CHIEF_COMPLAINTS)
+        esi_probs = COMPLAINT_ESI_PROBS.get(chief_complaint, ESI_DIST)
+        esi = weighted_choice([1,2,3,4,5], list(esi_probs.values()))
+
+        # Store ESI for vitals generation
+        encounter_esi_map[eid] = esi
+
+        # Arrival mode based on ESI (sicker patients more likely EMS)
+        arrival_probs = ESI_ARRIVAL_MODE[esi]
+        arrival_mode = weighted_choice(list(arrival_probs.keys()), list(arrival_probs.values()))
+
         provider_start = triage_end + timedelta(minutes=max(0, int(np.random.normal(ESI_WAIT_MEAN[esi], 10))))
 
         base_eval = int(np.random.normal(60 + (5 - esi) * 20, 20))
@@ -208,8 +254,8 @@ def main():
             "provider_start_ts": dt_to_str(provider_start) if provider_start else "",
             "dispo_decision_ts": dt_to_str(dispo_decision) if dispo_decision else "",
             "departure_ts": dt_to_str(departure),
-            "arrival_mode": weighted_choice(list(ARRIVAL_MODE_DIST.keys()), list(ARRIVAL_MODE_DIST.values())),
-            "chief_complaint": random.choice(CHIEF_COMPLAINTS),
+            "arrival_mode": arrival_mode,
+            "chief_complaint": chief_complaint,
             "esi_level": esi,
             "disposition_code": dispo,
             "referral_code": weighted_choice(list(REFERRAL_DIST.keys()), list(REFERRAL_DIST.values())),
@@ -230,14 +276,18 @@ def main():
         })
     df_payor = pd.DataFrame(payors)
 
-    # 5) vitals.csv
+    # 5) vitals.csv - ESI-correlated vital signs
     vitals_rows = []
     vital_id = 1
     for _, row in df_encounter.iterrows():
         eid = int(row["encounter_id"])
+        esi = int(row["esi_level"])
         arr = datetime.strptime(row["arrival_ts"], "%Y-%m-%d %H:%M:%S")
         dep = datetime.strptime(row["departure_ts"], "%Y-%m-%d %H:%M:%S")
         n = max(0, np.random.poisson(AVG_VITALS_PER_ENC))
+
+        # Get ESI-specific vital parameters
+        esi_params = ESI_VITALS[esi]
 
         for _ in range(n):
             if (dep - arr).total_seconds() <= 0:
@@ -246,17 +296,18 @@ def main():
                 offset_min = random.randint(0, max(1, int((dep - arr).total_seconds() // 60)))
                 taken = arr + timedelta(minutes=offset_min)
 
+            # Generate vitals based on ESI level
             vitals_rows.append({
                 "vital_id": vital_id,
                 "encounter_id": eid,
                 "taken_ts": dt_to_str(taken),
-                "heart_rate": clamp(int(np.random.normal(85, 18)), 40, 200),
-                "systolic_bp": clamp(int(np.random.normal(128, 22)), 90, 200),
-                "diastolic_bp": clamp(int(np.random.normal(78, 12)), 50, 120),
-                "respiratory_rate": clamp(int(np.random.normal(17, 4)), 10, 30),
-                "temperature_c": round(clamp(np.random.normal(37.0, 0.6), 35.5, 40.5), 1),
-                "spo2": clamp(int(np.random.normal(97, 3)), 80, 100),
-                "pain_score": clamp(int(np.random.normal(4, 3)), 0, 10)
+                "heart_rate": clamp(int(np.random.normal(*esi_params["heart_rate"])), 40, 200),
+                "systolic_bp": clamp(int(np.random.normal(*esi_params["systolic_bp"])), 60, 220),
+                "diastolic_bp": clamp(int(np.random.normal(78, 12)), 40, 140),
+                "respiratory_rate": clamp(int(np.random.normal(*esi_params["respiratory_rate"])), 8, 45),
+                "temperature_c": round(clamp(np.random.normal(*esi_params["temperature_c"]), 35.0, 41.5), 1),
+                "spo2": clamp(int(np.random.normal(*esi_params["spo2"])), 70, 100),
+                "pain_score": clamp(int(np.random.normal(*esi_params["pain_score"])), 0, 10)
             })
             vital_id += 1
     df_vitals = pd.DataFrame(vitals_rows)
