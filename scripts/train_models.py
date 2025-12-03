@@ -21,6 +21,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 import pickle
+import sqlite3
 from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.metrics import (accuracy_score, confusion_matrix, classification_report,
@@ -42,37 +43,44 @@ np.random.seed(42)
 print("="*80)
 print("Emergency Department Model Training Pipeline")
 print("="*80)
+print("Loading cleaned data from database...")
 
 # ============================================================================
-# STEP 1: Load Dataset
+# STEP 1: Load Dataset from Cleaned Database
 # ============================================================================
-print("\n[STEP 1] Loading corrected dataset...")
+print("\n[STEP 1] Loading cleaned dataset from database...")
 
-# Load all tables
-encounters = pd.read_csv('../dataset/encounter.csv')
-patients = pd.read_csv('../dataset/patient.csv')
-vitals = pd.read_csv('../dataset/vitals.csv')
-diagnoses = pd.read_csv('../dataset/diagnosis.csv')
-payors = pd.read_csv('../dataset/encounter_payor.csv')
+# Connect to database
+db_path = '../ed_database.db'
+conn = sqlite3.connect(db_path)
 
-print(f"  [OK] Loaded {len(encounters)} encounters")
-print(f"  [OK] Loaded {len(patients)} patients")
-print(f"  [OK] Loaded {len(vitals)} vitals records")
-print(f"  [OK] Loaded {len(diagnoses)} diagnosis records")
-print(f"  [OK] Loaded {len(payors)} payor records")
+# Load all tables from cleaned database
+encounters = pd.read_sql_query("SELECT * FROM encounter", conn)
+patients = pd.read_sql_query("SELECT * FROM patient", conn)
+vitals = pd.read_sql_query("SELECT * FROM vitals", conn)
+diagnoses = pd.read_sql_query("SELECT * FROM diagnosis", conn)
+payors = pd.read_sql_query("SELECT * FROM encounter_payor", conn)
+
+conn.close()
+
+print(f"  [OK] Loaded {len(encounters)} encounters (cleaned)")
+print(f"  [OK] Loaded {len(patients)} patients (cleaned)")
+print(f"  [OK] Loaded {len(vitals)} vitals records (cleaned)")
+print(f"  [OK] Loaded {len(diagnoses)} diagnosis records (cleaned)")
+print(f"  [OK] Loaded {len(payors)} payor records (cleaned)")
 
 # ============================================================================
 # STEP 2: Feature Engineering
 # ============================================================================
 print("\n[STEP 2] Feature engineering...")
 
-# Parse timestamps
-encounters['arrival_ts'] = pd.to_datetime(encounters['arrival_ts'])
-encounters['triage_start_ts'] = pd.to_datetime(encounters['triage_start_ts'])
-encounters['triage_end_ts'] = pd.to_datetime(encounters['triage_end_ts'])
-encounters['provider_start_ts'] = pd.to_datetime(encounters['provider_start_ts'])
-encounters['dispo_decision_ts'] = pd.to_datetime(encounters['dispo_decision_ts'])
-encounters['departure_ts'] = pd.to_datetime(encounters['departure_ts'])
+# Parse timestamps (handle empty strings from database)
+encounters['arrival_ts'] = pd.to_datetime(encounters['arrival_ts'], errors='coerce')
+encounters['triage_start_ts'] = pd.to_datetime(encounters['triage_start_ts'], errors='coerce')
+encounters['triage_end_ts'] = pd.to_datetime(encounters['triage_end_ts'], errors='coerce')
+encounters['provider_start_ts'] = pd.to_datetime(encounters['provider_start_ts'], errors='coerce')
+encounters['dispo_decision_ts'] = pd.to_datetime(encounters['dispo_decision_ts'], errors='coerce')
+encounters['departure_ts'] = pd.to_datetime(encounters['departure_ts'], errors='coerce')
 
 # Calculate wait time (arrival to provider) in minutes
 encounters['wait_time_minutes'] = (
@@ -95,11 +103,15 @@ print(f"  [OK] Calculated length of stay (mean: {encounters['los_minutes'].mean(
 print(f"  [OK] Extracted temporal features")
 
 # Merge with patient demographics
-patients['dob'] = pd.to_datetime(patients['dob'])
+patients['dob'] = pd.to_datetime(patients['dob'], errors='coerce')
 df = encounters.merge(patients, on='patient_id', how='left')
 
-# Calculate patient age in years
-df['patient_age'] = ((df['arrival_ts'] - df['dob']).dt.days / 365.25).astype(int)
+# Calculate patient age in years (handle missing DOB)
+df['patient_age'] = ((df['arrival_ts'] - df['dob']).dt.days / 365.25)
+df['patient_age'] = df['patient_age'].fillna(df['patient_age'].median()).astype(int)
+
+# Parse vitals timestamps
+vitals['taken_ts'] = pd.to_datetime(vitals['taken_ts'], errors='coerce')
 
 # Merge first vitals for each encounter
 first_vitals = vitals.sort_values('taken_ts').groupby('encounter_id').first().reset_index()

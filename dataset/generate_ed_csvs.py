@@ -32,6 +32,12 @@ AVG_VITALS_PER_ENC = 1.6      # Poisson mean
 AVG_DIAG_PER_ENC = 1.4        # Poisson mean
 AVG_ASSIGN_PER_ENC = 1.6      # Poisson mean
 
+# Data quality issues to introduce (for ETL cleaning demonstration)
+MISSING_VALUE_RATE = 0.03      # 3% will have missing values
+OUT_OF_RANGE_RATE = 0.02       # 2% will have out-of-range values
+INVALID_FK_RATE = 0.01         # 1% will have invalid foreign keys
+INVALID_ENUM_RATE = 0.02       # 2% will have invalid enum values
+
 OUT_DIR = "."  # current folder
 
 np.random.seed(SEED)
@@ -194,32 +200,62 @@ def main():
         bucket = weighted_choice(["child","young_adult","middle","senior"], [0.22,0.34,0.24,0.20])
         age = {"child": (0,18), "young_adult": (19,44), "middle": (45,64), "senior": (65,95)}[bucket]
         age = random.randint(*age)
+        
+        # Introduce missing values
+        dob = birthdate_from_age(age) if random.random() > MISSING_VALUE_RATE else ""
+        sex_at_birth = weighted_choice(["Male","Female"], [0.49, 0.51]) if random.random() > MISSING_VALUE_RATE else ""
+        gender_identity = weighted_choice(["Male","Female","Non-binary","Prefer not to say"], [0.47,0.47,0.03,0.03]) if random.random() > MISSING_VALUE_RATE else ""
+        zip_code = f"{random.randint(10000, 99999)}" if random.random() > MISSING_VALUE_RATE else ""
+        
         patients.append({
             "patient_id": pid,
-            "dob": birthdate_from_age(age),
-            "sex_at_birth": weighted_choice(["Male","Female"], [0.49, 0.51]),
-            "gender_identity": weighted_choice(["Male","Female","Non-binary","Prefer not to say"], [0.47,0.47,0.03,0.03]),
-            "zip_code": f"{random.randint(10000, 99999)}"
+            "dob": dob,
+            "sex_at_birth": sex_at_birth,
+            "gender_identity": gender_identity,
+            "zip_code": zip_code
         })
     df_patient = pd.DataFrame(patients)
 
     # 2) staff.csv
     STAFF_ROLES = ["MD_ATT","MD_RES","PA","NP","RN","TECH","REG"]
-    staff = [{
-        "staff_id": sid,
-        "first_name": f"F{sid}",
-        "last_name": f"L{sid}",
-        "role_code": random.choice(STAFF_ROLES),
-        "department": "ED",
-        "is_active": 1 if random.random() < 0.92 else 0
-    } for sid in range(1, N_STAFF+1)]
+    staff = []
+    for sid in range(1, N_STAFF+1):
+        # Introduce invalid role codes
+        if random.random() < INVALID_ENUM_RATE:
+            role_code = random.choice(["INVALID", "UNKNOWN", "", "NURSE", "DOCTOR"])
+        else:
+            role_code = random.choice(STAFF_ROLES)
+        
+        # Introduce missing values
+        first_name = f"F{sid}" if random.random() > MISSING_VALUE_RATE else ""
+        last_name = f"L{sid}" if random.random() > MISSING_VALUE_RATE else ""
+        
+        # Introduce invalid is_active values
+        if random.random() < OUT_OF_RANGE_RATE:
+            is_active = random.choice([2, 3, -1, 99])  # Invalid values
+        else:
+            is_active = 1 if random.random() < 0.92 else 0
+        
+        staff.append({
+            "staff_id": sid,
+            "first_name": first_name,
+            "last_name": last_name,
+            "role_code": role_code,
+            "department": "ED",
+            "is_active": is_active
+        })
     df_staff = pd.DataFrame(staff)
 
     # 3) encounter.csv - with realistic ESI correlations
     encounters = []
     encounter_esi_map = {}  # Store ESI for each encounter for vitals generation
     for eid in range(1, N_ENCOUNTERS+1):
-        pid = random.randint(1, N_PATIENTS)
+        # Introduce invalid foreign keys
+        if random.random() < INVALID_FK_RATE:
+            pid = random.randint(N_PATIENTS + 1, N_PATIENTS + 100)  # Non-existent patient IDs
+        else:
+            pid = random.randint(1, N_PATIENTS)
+        
         arr = random_arrival_time()
         triage_start = arr + timedelta(minutes=random.randint(0, 20))
         triage_end = triage_start + timedelta(minutes=random.randint(5, 20))
@@ -234,20 +270,33 @@ def main():
         if random.random() < NURSE_VARIABILITY_RATE:
             shift = random.choice([-1, 1])
             esi = clamp(esi + shift, 1, 5)
+        
+        # Store valid ESI for calculations (vitals, timing, etc.)
+        esi_for_calc = esi
+        
+        # Introduce invalid ESI levels (but keep valid one for calculations)
+        if random.random() < OUT_OF_RANGE_RATE:
+            esi = random.choice([0, 6, 7, 99, -1])  # Invalid ESI levels
 
-        # Store ESI for vitals generation
-        encounter_esi_map[eid] = esi
+        # Store ESI for vitals generation (use valid ESI for vitals)
+        encounter_esi_map[eid] = esi_for_calc
 
         # Arrival mode based on ESI (sicker patients more likely EMS)
-        arrival_probs = ESI_ARRIVAL_MODE[esi]
-        arrival_mode = weighted_choice(list(arrival_probs.keys()), list(arrival_probs.values()))
+        if random.random() < INVALID_ENUM_RATE:
+            arrival_mode = random.choice(["Invalid", "Unknown", "Helicopter", "", "Ambulance"])
+        else:
+            if esi_for_calc in ESI_ARRIVAL_MODE:
+                arrival_probs = ESI_ARRIVAL_MODE[esi_for_calc]
+                arrival_mode = weighted_choice(list(arrival_probs.keys()), list(arrival_probs.values()))
+            else:
+                arrival_mode = weighted_choice(list(ARRIVAL_MODE_DIST.keys()), list(ARRIVAL_MODE_DIST.values()))
 
-        provider_start = triage_end + timedelta(minutes=max(0, int(np.random.normal(ESI_WAIT_MEAN[esi], 10))))
+        provider_start = triage_end + timedelta(minutes=max(0, int(np.random.normal(ESI_WAIT_MEAN[esi_for_calc], 10))))
 
-        base_eval = int(np.random.normal(60 + (5 - esi) * 20, 20))
+        base_eval = int(np.random.normal(60 + (5 - esi_for_calc) * 20, 20))
         dispo_decision = provider_start + timedelta(minutes=max(10, base_eval))
 
-        base_dep = int(np.random.normal(30 + (5 - esi) * 10, 15))
+        base_dep = int(np.random.normal(30 + (5 - esi_for_calc) * 10, 15))
         departure = dispo_decision + timedelta(minutes=max(5, base_dep))
 
         dispo = weighted_choice(list(DISPO_DIST.keys()), list(DISPO_DIST.values()))
@@ -257,20 +306,34 @@ def main():
             dispo_decision = None
             departure = triage_end + timedelta(minutes=random.randint(10, 60))
 
+        # Introduce missing timestamps
+        arrival_ts = dt_to_str(arr) if random.random() > MISSING_VALUE_RATE else ""
+        triage_start_ts = dt_to_str(triage_start) if random.random() > MISSING_VALUE_RATE else ""
+        triage_end_ts = dt_to_str(triage_end) if random.random() > MISSING_VALUE_RATE else ""
+        provider_start_ts = dt_to_str(provider_start) if provider_start and random.random() > MISSING_VALUE_RATE else ""
+        dispo_decision_ts = dt_to_str(dispo_decision) if dispo_decision and random.random() > MISSING_VALUE_RATE else ""
+        departure_ts = dt_to_str(departure) if random.random() > MISSING_VALUE_RATE else ""
+        
+        # Introduce invalid left_without_being_seen values
+        if random.random() < OUT_OF_RANGE_RATE:
+            lwbs = random.choice([2, 3, -1, 99])
+        else:
+            lwbs = 1 if dispo == "LWBS" else 0
+        
         encounters.append({
             "encounter_id": eid,
             "patient_id": pid,
-            "arrival_ts": dt_to_str(arr),
-            "triage_start_ts": dt_to_str(triage_start),
-            "triage_end_ts": dt_to_str(triage_end),
-            "provider_start_ts": dt_to_str(provider_start) if provider_start else "",
-            "dispo_decision_ts": dt_to_str(dispo_decision) if dispo_decision else "",
-            "departure_ts": dt_to_str(departure),
+            "arrival_ts": arrival_ts,
+            "triage_start_ts": triage_start_ts,
+            "triage_end_ts": triage_end_ts,
+            "provider_start_ts": provider_start_ts,
+            "dispo_decision_ts": dispo_decision_ts,
+            "departure_ts": departure_ts,
             "arrival_mode": arrival_mode,
-            "chief_complaint": chief_complaint,
+            "chief_complaint": chief_complaint if random.random() > MISSING_VALUE_RATE else "",
             "esi_level": esi,
-            "disposition_code": dispo,
-            "referral_code": weighted_choice(list(REFERRAL_DIST.keys()), list(REFERRAL_DIST.values())),
+            "disposition_code": dispo if random.random() > MISSING_VALUE_RATE else "",
+            "referral_code": weighted_choice(list(REFERRAL_DIST.keys()), list(REFERRAL_DIST.values())) if random.random() > MISSING_VALUE_RATE else "",
             "left_without_being_seen": lwbs,
             "notes": ""
         })
@@ -279,12 +342,25 @@ def main():
     # 4) encounter_payor.csv
     payors = []
     for eid in range(1, N_ENCOUNTERS+1):
+        # Introduce invalid foreign keys
+        if random.random() < INVALID_FK_RATE:
+            encounter_id = random.randint(N_ENCOUNTERS + 1, N_ENCOUNTERS + 100)
+        else:
+            encounter_id = eid
+        
         name = weighted_choice(list(PAYOR_NAME_DIST.keys()), list(PAYOR_NAME_DIST.values()))
+        
+        # Introduce invalid payor types
+        if random.random() < INVALID_ENUM_RATE:
+            payor_type = random.choice(["Invalid", "Unknown", "", "Government"])
+        else:
+            payor_type = PAYOR_TYPE_MAP[name]
+        
         payors.append({
-            "encounter_id": eid,
-            "payor_name": name,
-            "payor_type": PAYOR_TYPE_MAP[name],
-            "member_id": "" if name == "Self-pay" else random_string(random.randint(8,12))
+            "encounter_id": encounter_id,
+            "payor_name": name if random.random() > MISSING_VALUE_RATE else "",
+            "payor_type": payor_type,
+            "member_id": "" if name == "Self-pay" else (random_string(random.randint(8,12)) if random.random() > MISSING_VALUE_RATE else "")
         })
     df_payor = pd.DataFrame(payors)
 
@@ -293,9 +369,24 @@ def main():
     vital_id = 1
     for _, row in df_encounter.iterrows():
         eid = int(row["encounter_id"])
-        esi = int(row["esi_level"])
-        arr = datetime.strptime(row["arrival_ts"], "%Y-%m-%d %H:%M:%S")
-        dep = datetime.strptime(row["departure_ts"], "%Y-%m-%d %H:%M:%S")
+        # Handle invalid ESI levels - use valid one for vitals generation
+        try:
+            esi = int(row["esi_level"]) if row["esi_level"] != '' else 3
+            if esi not in ESI_VITALS:
+                esi = 3  # Default to ESI 3 if invalid
+        except (ValueError, TypeError):
+            esi = 3
+        
+        # Skip if timestamps are missing
+        if not row["arrival_ts"] or not row["departure_ts"] or row["arrival_ts"] == "" or row["departure_ts"] == "":
+            continue
+        
+        try:
+            arr = datetime.strptime(row["arrival_ts"], "%Y-%m-%d %H:%M:%S")
+            dep = datetime.strptime(row["departure_ts"], "%Y-%m-%d %H:%M:%S")
+        except (ValueError, TypeError):
+            continue  # Skip if timestamp parsing fails
+        
         n = max(0, np.random.poisson(AVG_VITALS_PER_ENC))
 
         # Get ESI-specific vital parameters
@@ -308,18 +399,44 @@ def main():
                 offset_min = random.randint(0, max(1, int((dep - arr).total_seconds() // 60)))
                 taken = arr + timedelta(minutes=offset_min)
 
-            # Generate vitals based on ESI level
+            # Introduce invalid foreign keys
+            if random.random() < INVALID_FK_RATE:
+                encounter_id = random.randint(N_ENCOUNTERS + 1, N_ENCOUNTERS + 100)
+            else:
+                encounter_id = eid
+            
+            # Introduce missing timestamps
+            taken_ts = dt_to_str(taken) if random.random() > MISSING_VALUE_RATE else ""
+            
+            # Generate vitals - introduce out-of-range values
+            if random.random() < OUT_OF_RANGE_RATE:
+                heart_rate = random.choice([0, -10, 500, 999])
+                systolic_bp = random.choice([0, 500, 999])
+                diastolic_bp = random.choice([0, 200, 999])
+                respiratory_rate = random.choice([0, 100, 999])
+                temperature_c = random.choice([0.0, 50.0, 100.0])
+                spo2 = random.choice([0, 150, 999])
+                pain_score = random.choice([-5, 20, 99])
+            else:
+                heart_rate = clamp(int(np.random.normal(*esi_params["heart_rate"])), 40, 200)
+                systolic_bp = clamp(int(np.random.normal(*esi_params["systolic_bp"])), 60, 220)
+                diastolic_bp = clamp(int(np.random.normal(78, 12)), 40, 140)
+                respiratory_rate = clamp(int(np.random.normal(*esi_params["respiratory_rate"])), 8, 45)
+                temperature_c = round(clamp(np.random.normal(*esi_params["temperature_c"]), 35.0, 41.5), 1)
+                spo2 = clamp(int(np.random.normal(*esi_params["spo2"])), 70, 100)
+                pain_score = clamp(int(np.random.normal(*esi_params["pain_score"])), 0, 10)
+            
             vitals_rows.append({
                 "vital_id": vital_id,
-                "encounter_id": eid,
-                "taken_ts": dt_to_str(taken),
-                "heart_rate": clamp(int(np.random.normal(*esi_params["heart_rate"])), 40, 200),
-                "systolic_bp": clamp(int(np.random.normal(*esi_params["systolic_bp"])), 60, 220),
-                "diastolic_bp": clamp(int(np.random.normal(78, 12)), 40, 140),
-                "respiratory_rate": clamp(int(np.random.normal(*esi_params["respiratory_rate"])), 8, 45),
-                "temperature_c": round(clamp(np.random.normal(*esi_params["temperature_c"]), 35.0, 41.5), 1),
-                "spo2": clamp(int(np.random.normal(*esi_params["spo2"])), 70, 100),
-                "pain_score": clamp(int(np.random.normal(*esi_params["pain_score"])), 0, 10)
+                "encounter_id": encounter_id,
+                "taken_ts": taken_ts,
+                "heart_rate": heart_rate,
+                "systolic_bp": systolic_bp,
+                "diastolic_bp": diastolic_bp,
+                "respiratory_rate": respiratory_rate,
+                "temperature_c": temperature_c,
+                "spo2": spo2,
+                "pain_score": pain_score
             })
             vital_id += 1
     df_vitals = pd.DataFrame(vitals_rows)
@@ -328,12 +445,35 @@ def main():
     diag_rows = []
     for _, row in df_encounter.iterrows():
         eid = int(row["encounter_id"])
-        lwbs = int(row["left_without_being_seen"])
+        lwbs = int(row["left_without_being_seen"]) if row["left_without_being_seen"] in [0, 1] else 0
         base_n = np.random.poisson(AVG_DIAG_PER_ENC)
         n = 0 if lwbs == 1 else max(1, base_n)
+        
+        # Introduce invalid foreign keys
+        if random.random() < INVALID_FK_RATE:
+            encounter_id = random.randint(N_ENCOUNTERS + 1, N_ENCOUNTERS + 100)
+        else:
+            encounter_id = eid
+        
         chosen = random.sample(DIAG_CODES, k=min(n, len(DIAG_CODES)))
         for j, code in enumerate(chosen):
-            diag_rows.append({"encounter_id": eid, "code": code, "is_primary": 1 if j == 0 else 0})
+            # Introduce invalid diagnosis codes
+            if random.random() < INVALID_ENUM_RATE:
+                diag_code = random.choice(["INVALID", "XXX", "", "999.99", "NOT_A_CODE"])
+            else:
+                diag_code = code
+            
+            # Introduce invalid is_primary values
+            if random.random() < OUT_OF_RANGE_RATE:
+                is_primary = random.choice([2, 3, -1, 99])
+            else:
+                is_primary = 1 if j == 0 else 0
+            
+            diag_rows.append({
+                "encounter_id": encounter_id, 
+                "code": diag_code, 
+                "is_primary": is_primary
+            })
     df_diagnosis = pd.DataFrame(diag_rows)
 
     # 7) staff_assignment.csv
@@ -341,18 +481,36 @@ def main():
     seen_assignments = set()
     for _, row in df_encounter.iterrows():
         eid = int(row["encounter_id"])
-        arr = datetime.strptime(row["arrival_ts"], "%Y-%m-%d %H:%M:%S")
-        dep = datetime.strptime(row["departure_ts"], "%Y-%m-%d %H:%M:%S")
+        
+        # Skip if timestamps are missing
+        if not row["arrival_ts"] or not row["departure_ts"] or row["arrival_ts"] == "" or row["departure_ts"] == "":
+            continue
+        
+        try:
+            arr = datetime.strptime(row["arrival_ts"], "%Y-%m-%d %H:%M:%S")
+            dep = datetime.strptime(row["departure_ts"], "%Y-%m-%d %H:%M:%S")
+        except (ValueError, TypeError):
+            continue  # Skip if timestamp parsing fails
 
         n = max(0, np.random.poisson(AVG_ASSIGN_PER_ENC))
-        if row["left_without_being_seen"] == 0 and n == 0:
+        lwbs_val = row["left_without_being_seen"]
+        if (lwbs_val == 0 or lwbs_val == "0") and n == 0:
             n = 1
 
         for _ in range(n):
-            sid = random.randint(1, N_STAFF)
-            role = df_staff.loc[df_staff["staff_id"] == sid, "role_code"].values[0]
-            role_map = {"MD_ATT":"Attending","MD_RES":"Resident","PA":"PA","NP":"NP","RN":"RN","TECH":"Tech","REG":"Registration"}
-            arole = role_map.get(role, "RN")
+            # Introduce invalid foreign keys
+            if random.random() < INVALID_FK_RATE:
+                sid = random.randint(N_STAFF + 1, N_STAFF + 100)  # Non-existent staff ID
+                arole = "Attending"  # Default role
+            else:
+                sid = random.randint(1, N_STAFF)
+                role = df_staff.loc[df_staff["staff_id"] == sid, "role_code"].values[0] if sid <= N_STAFF else "RN"
+                role_map = {"MD_ATT":"Attending","MD_RES":"Resident","PA":"PA","NP":"NP","RN":"RN","TECH":"Tech","REG":"Registration"}
+                arole = role_map.get(role, "RN")
+            
+            # Introduce invalid assignment roles
+            if random.random() < INVALID_ENUM_RATE:
+                arole = random.choice(["Invalid", "Unknown", "", "Nurse", "Doctor"])
 
             if (dep - arr).total_seconds() <= 0:
                 assigned_dt = arr
@@ -371,12 +529,22 @@ def main():
 
             seen_assignments.add(key)
 
+            # Introduce invalid foreign keys for encounter_id
+            if random.random() < INVALID_FK_RATE:
+                encounter_id = random.randint(N_ENCOUNTERS + 1, N_ENCOUNTERS + 100)
+            else:
+                encounter_id = eid
+            
+            # Introduce missing timestamps
+            assigned_ts = dt_to_str(assigned_dt) if random.random() > MISSING_VALUE_RATE else ""
+            released_ts = dt_to_str(released_dt) if random.random() > MISSING_VALUE_RATE else ""
+            
             assign_rows.append({
-                "encounter_id": eid,
+                "encounter_id": encounter_id,
                 "staff_id": sid,
                 "assignment_role": arole,
-                "assigned_ts": dt_to_str(assigned_dt),
-                "released_ts": dt_to_str(released_dt)
+                "assigned_ts": assigned_ts,
+                "released_ts": released_ts
             })
     df_staff_assignment = pd.DataFrame(assign_rows)
 

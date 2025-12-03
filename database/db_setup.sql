@@ -91,6 +91,18 @@ CREATE INDEX IF NOT EXISTS idx_vitals_enc_ts ON vitals(encounter_id, taken_ts);
 CREATE INDEX IF NOT EXISTS idx_staff_assign  ON staff_assignment(staff_id, assigned_ts);
 
 -- =========
+-- Cleaning Log (for ETL process tracking)
+-- =========
+CREATE TABLE IF NOT EXISTS cleaning_log (
+  log_id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  table_name        TEXT NOT NULL,
+  issue_type        TEXT NOT NULL,  -- 'header_row', 'missing_value', 'out_of_range', 'invalid_fk', 'invalid_enum'
+  issue_description TEXT,
+  rows_affected     INTEGER,
+  created_at        TEXT DEFAULT (datetime('now'))
+);
+
+-- =========
 -- Analytics Views
 -- =========
 -- Wait time (minutes) from arrival -> provider
