@@ -34,37 +34,61 @@ def load_models():
         return
 
     models_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'trained_models')
+    loaded_count = 0
+    failed_models = []
 
+    # Load classification models (new format: dict with 'model' and 'scaler')
+    model_files = {
+        'logistic': 'esi_logistic.pkl',
+        'lda': 'esi_lda.pkl',
+        'naive_bayes': 'esi_naive_bayes.pkl',
+        'random_forest': 'esi_random_forest.pkl',
+        'gradient_boosting': 'esi_gradient_boosting.pkl'
+    }
+
+    for model_name, filename in model_files.items():
+        try:
+            with open(os.path.join(models_dir, filename), 'rb') as f:
+                model_data = pickle.load(f)
+                if model_name == 'logistic':
+                    _esi_logistic = model_data
+                elif model_name == 'lda':
+                    _esi_lda = model_data
+                elif model_name == 'naive_bayes':
+                    _esi_nb = model_data
+                elif model_name == 'random_forest':
+                    _esi_rf = model_data
+                elif model_name == 'gradient_boosting':
+                    _esi_gb = model_data
+                loaded_count += 1
+                print(f"[INFO] Loaded {model_name} model successfully")
+        except Exception as e:
+            failed_models.append(f"{model_name}: {str(e)}")
+            print(f"[WARNING] Failed to load {model_name} model: {e}")
+
+    # Load regression models
     try:
-        # Load classification models (new format: dict with 'model' and 'scaler')
-        with open(os.path.join(models_dir, 'esi_logistic.pkl'), 'rb') as f:
-            _esi_logistic = pickle.load(f)
-
-        with open(os.path.join(models_dir, 'esi_lda.pkl'), 'rb') as f:
-            _esi_lda = pickle.load(f)
-
-        with open(os.path.join(models_dir, 'esi_naive_bayes.pkl'), 'rb') as f:
-            _esi_nb = pickle.load(f)
-
-        with open(os.path.join(models_dir, 'esi_random_forest.pkl'), 'rb') as f:
-            _esi_rf = pickle.load(f)
-
-        with open(os.path.join(models_dir, 'esi_gradient_boosting.pkl'), 'rb') as f:
-            _esi_gb = pickle.load(f)
-
-        # Load regression models
         with open(os.path.join(models_dir, 'wait_time_predictor.pkl'), 'rb') as f:
             _wait_time_model = pickle.load(f)
+        loaded_count += 1
+        print("[INFO] Loaded wait_time model successfully")
+    except Exception as e:
+        failed_models.append(f"wait_time: {str(e)}")
+        print(f"[WARNING] Failed to load wait_time model: {e}")
 
+    try:
         with open(os.path.join(models_dir, 'volume_predictor.pkl'), 'rb') as f:
             _volume_model = pickle.load(f)
-
-        _models_loaded = True
-        print("[INFO] All models loaded successfully")
-
+        loaded_count += 1
+        print("[INFO] Loaded volume model successfully")
     except Exception as e:
-        print(f"[ERROR] Failed to load models: {e}")
-        raise
+        failed_models.append(f"volume: {str(e)}")
+        print(f"[WARNING] Failed to load volume model: {e}")
+
+    _models_loaded = True
+    if failed_models:
+        print(f"[WARNING] Some models failed to load: {failed_models}")
+    print(f"[INFO] Successfully loaded {loaded_count} model(s)")
 
 
 @predictions_bp.route('/models/info', methods=['GET'])
@@ -183,20 +207,30 @@ def predict_esi():
             return jsonify({'error': f'Missing required features: {missing}'}), 400
 
         # Create DataFrame for one-hot encoding (matches training format)
-        df = pd.DataFrame([features])
+        # Note: Remove arrival_day_of_week and is_weekend as they're not in classification features
+        df_features = {
+            'patient_age': features['patient_age'],
+            'sex_at_birth': features['sex_at_birth'],
+            'arrival_mode': features['arrival_mode'],
+            'chief_complaint': features['chief_complaint'],
+            'heart_rate': features['heart_rate'],
+            'bp_systolic': features['bp_systolic'],
+            'bp_diastolic': features['bp_diastolic'],
+            'respiratory_rate': features['respiratory_rate'],
+            'temperature_c': features['temperature_c'],
+            'o2_saturation': features['o2_saturation'],
+            'pain_score': features['pain_score'],
+            'arrival_hour': features['arrival_hour'],
+            'payor_type': features['payor_type']
+        }
+        df = pd.DataFrame([df_features])
 
         # One-hot encode categorical variables
         df_encoded = pd.get_dummies(df,
                                     columns=['sex_at_birth', 'arrival_mode', 'chief_complaint', 'payor_type'],
                                     drop_first=True)
 
-        # Ensure all expected columns exist (add missing with 0)
-        # This handles cases where the input doesn't have all categorical values
-        expected_cols = 27  # From training
-        if len(df_encoded.columns) < expected_cols:
-            for i in range(len(df_encoded.columns), expected_cols):
-                df_encoded[f'dummy_{i}'] = 0
-
+        # Get model first to access scaler's expected feature names
         # Select model (all models now contain dict with 'model' and 'scaler')
         model_dict = None
         if model_type == 'random_forest':
@@ -212,12 +246,64 @@ def predict_esi():
         else:
             return jsonify({'error': f'Unknown model type: {model_type}. Options: random_forest, gradient_boosting, logistic, lda, naive_bayes'}), 400
 
+        # Check if model is available
+        if model_dict is None:
+            # Try to find an available model as fallback
+            available_models = []
+            if _esi_rf is not None:
+                available_models.append('random_forest')
+            if _esi_logistic is not None:
+                available_models.append('logistic')
+            if _esi_lda is not None:
+                available_models.append('lda')
+            if _esi_nb is not None:
+                available_models.append('naive_bayes')
+            if _esi_gb is not None:
+                available_models.append('gradient_boosting')
+            
+            if not available_models:
+                return jsonify({'error': 'No ESI prediction models are available. Please check model files and dependencies.'}), 503
+            
+            # Use first available model as fallback
+            fallback_model = available_models[0]
+            if model_type == 'random_forest':
+                model_dict = _esi_rf if _esi_rf else (_esi_logistic if _esi_logistic else _esi_lda)
+            elif model_type == 'logistic':
+                model_dict = _esi_logistic if _esi_logistic else (_esi_rf if _esi_rf else _esi_lda)
+            elif model_type == 'lda':
+                model_dict = _esi_lda if _esi_lda else (_esi_logistic if _esi_logistic else _esi_rf)
+            elif model_type == 'naive_bayes':
+                model_dict = _esi_nb if _esi_nb else (_esi_logistic if _esi_logistic else _esi_rf)
+            elif model_type == 'gradient_boosting':
+                model_dict = _esi_gb if _esi_gb else (_esi_rf if _esi_rf else _esi_logistic)
+            
+            if model_dict is None:
+                return jsonify({
+                    'error': f'Requested model "{model_type}" is not available. Available models: {", ".join(available_models)}',
+                    'available_models': available_models
+                }), 503
+            
+            model_type = fallback_model  # Update to reflect the model actually used
+
         # Get model and scaler from dict
         model = model_dict['model']
         scaler = model_dict['scaler']
 
+        # Convert DataFrame to numpy array
+        X = df_encoded.values
+
+        # Ensure X has the right shape for the scaler
+        expected_feature_count = scaler.n_features_in_ if hasattr(scaler, 'n_features_in_') else X.shape[1]
+        
+        if X.shape[1] < expected_feature_count:
+            # Pad with zeros if we have fewer features
+            padding = np.zeros((X.shape[0], expected_feature_count - X.shape[1]))
+            X = np.hstack([X, padding])
+        elif X.shape[1] > expected_feature_count:
+            # Truncate if we have more features
+            X = X[:, :expected_feature_count]
+
         # Predict (scale features first)
-        X = df_encoded.iloc[:, :27].values  # Take first 27 columns
         X_scaled = scaler.transform(X)
         prediction = model.predict(X_scaled)[0]
         probabilities = model.predict_proba(X_scaled)[0] if hasattr(model, 'predict_proba') else None

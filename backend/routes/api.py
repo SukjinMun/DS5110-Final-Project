@@ -6,10 +6,26 @@ Provides RESTful API for frontend and statistical analysis.
 
 from flask import Blueprint, jsonify, request
 from sqlalchemy import func, desc
-from config.database import get_session
+from functools import wraps
+from config.database import get_session, db_session
 from models.orm_models import Patient, Staff, Encounter, EncounterPayor, Vitals, Diagnosis, StaffAssignment
 
 api_bp = Blueprint('api', __name__)
+
+def with_session(f):
+    """Decorator to ensure database session is properly closed"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        try:
+            return f(*args, **kwargs)
+        finally:
+            # Ensure session is removed/closed (if db_session is initialized)
+            if db_session is not None:
+                try:
+                    db_session.remove()
+                except Exception:
+                    pass  # Ignore errors during cleanup
+    return decorated_function
 
 @api_bp.route('/health', methods=['GET'])
 def health_check():
@@ -20,78 +36,88 @@ def health_check():
     })
 
 @api_bp.route('/encounters', methods=['GET'])
+@with_session
 def get_encounters():
     """Get all encounters with optional filtering"""
     session = get_session()
+    try:
+        # Query parameters for filtering
+        esi_level = request.args.get('esi_level', type=int)
+        disposition = request.args.get('disposition')
+        limit = request.args.get('limit', default=100, type=int)
+        offset = request.args.get('offset', default=0, type=int)
 
-    # Query parameters for filtering
-    esi_level = request.args.get('esi_level', type=int)
-    disposition = request.args.get('disposition')
-    limit = request.args.get('limit', default=100, type=int)
-    offset = request.args.get('offset', default=0, type=int)
+        query = session.query(Encounter)
 
-    query = session.query(Encounter)
+        # Apply filters
+        if esi_level:
+            query = query.filter(Encounter.esi_level == esi_level)
+        if disposition:
+            query = query.filter(Encounter.disposition_code == disposition)
 
-    # Apply filters
-    if esi_level:
-        query = query.filter(Encounter.esi_level == esi_level)
-    if disposition:
-        query = query.filter(Encounter.disposition_code == disposition)
+        # Pagination
+        total = query.count()
+        encounters = query.limit(limit).offset(offset).all()
 
-    # Pagination
-    total = query.count()
-    encounters = query.limit(limit).offset(offset).all()
-
-    return jsonify({
-        'total': total,
-        'limit': limit,
-        'offset': offset,
-        'data': [enc.to_dict() for enc in encounters]
-    })
+        return jsonify({
+            'total': total,
+            'limit': limit,
+            'offset': offset,
+            'data': [enc.to_dict() for enc in encounters]
+        })
+    finally:
+        session.close()
 
 @api_bp.route('/encounters/<int:encounter_id>', methods=['GET'])
+@with_session
 def get_encounter_detail(encounter_id):
     """Get detailed encounter information with related data"""
     session = get_session()
+    try:
+        encounter = session.query(Encounter).filter(Encounter.encounter_id == encounter_id).first()
 
-    encounter = session.query(Encounter).filter(Encounter.encounter_id == encounter_id).first()
+        if not encounter:
+            return jsonify({'error': 'Encounter not found'}), 404
 
-    if not encounter:
-        return jsonify({'error': 'Encounter not found'}), 404
+        # Get related data
+        payor = session.query(EncounterPayor).filter(EncounterPayor.encounter_id == encounter_id).first()
+        vitals = session.query(Vitals).filter(Vitals.encounter_id == encounter_id).all()
+        diagnoses = session.query(Diagnosis).filter(Diagnosis.encounter_id == encounter_id).all()
+        staff = session.query(StaffAssignment).filter(StaffAssignment.encounter_id == encounter_id).all()
 
-    # Get related data
-    payor = session.query(EncounterPayor).filter(EncounterPayor.encounter_id == encounter_id).first()
-    vitals = session.query(Vitals).filter(Vitals.encounter_id == encounter_id).all()
-    diagnoses = session.query(Diagnosis).filter(Diagnosis.encounter_id == encounter_id).all()
-    staff = session.query(StaffAssignment).filter(StaffAssignment.encounter_id == encounter_id).all()
-
-    return jsonify({
-        'encounter': encounter.to_dict(),
-        'payor': payor.to_dict() if payor else None,
-        'vitals': [v.to_dict() for v in vitals],
-        'diagnoses': [d.to_dict() for d in diagnoses],
-        'staff_assignments': [s.to_dict() for s in staff]
-    })
+        return jsonify({
+            'encounter': encounter.to_dict(),
+            'payor': payor.to_dict() if payor else None,
+            'vitals': [v.to_dict() for v in vitals],
+            'diagnoses': [d.to_dict() for d in diagnoses],
+            'staff_assignments': [s.to_dict() for s in staff]
+        })
+    finally:
+        session.close()
 
 @api_bp.route('/patients/<int:patient_id>', methods=['GET'])
+@with_session
 def get_patient(patient_id):
     """Get patient information and encounter history"""
     session = get_session()
+    try:
+        patient = session.query(Patient).filter(Patient.patient_id == patient_id).first()
 
-    patient = session.query(Patient).filter(Patient.patient_id == patient_id).first()
+        if not patient:
+            return jsonify({'error': 'Patient not found'}), 404
 
-    if not patient:
-        return jsonify({'error': 'Patient not found'}), 404
+        encounters = session.query(Encounter).filter(Encounter.patient_id == patient_id).all()
 
-    encounters = session.query(Encounter).filter(Encounter.patient_id == patient_id).all()
-
-    return jsonify({
-        'patient': patient.to_dict(),
-        'encounter_count': len(encounters),
-        'encounters': [enc.to_dict() for enc in encounters]
-    })
+        return jsonify({
+            'patient': patient.to_dict(),
+            'encounter_count': len(encounters),
+            'encounters': [enc.to_dict() for enc in encounters]
+        })
+    finally:
+        session.close()
 
 @api_bp.route('/statistics/overview', methods=['GET'])
+@with_session
 def get_statistics_overview():
     """Get overall ED statistics"""
     session = get_session()
@@ -165,6 +191,7 @@ def get_esi_statistics():
     return jsonify({'esi_statistics': esi_stats})
 
 @api_bp.route('/statistics/vitals', methods=['GET'])
+@with_session
 def get_vitals_statistics():
     """Get vital signs statistics"""
     session = get_session()
@@ -192,6 +219,7 @@ def get_vitals_statistics():
     })
 
 @api_bp.route('/statistics/payor', methods=['GET'])
+@with_session
 def get_payor_statistics():
     """Get payor distribution statistics"""
     session = get_session()
@@ -214,6 +242,7 @@ def get_payor_statistics():
     })
 
 @api_bp.route('/statistics/diagnoses', methods=['GET'])
+@with_session
 def get_diagnosis_statistics():
     """Get diagnosis code statistics"""
     session = get_session()
@@ -238,6 +267,7 @@ def get_diagnosis_statistics():
     })
 
 @api_bp.route('/chief-complaints', methods=['GET'])
+@with_session
 def get_chief_complaints():
     """Get chief complaint distribution"""
     session = get_session()
@@ -252,6 +282,7 @@ def get_chief_complaints():
     })
 
 @api_bp.route('/staff', methods=['GET'])
+@with_session
 def get_staff():
     """Get staff list"""
     session = get_session()
