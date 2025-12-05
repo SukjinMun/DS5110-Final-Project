@@ -129,13 +129,13 @@ The database is auto-generated from CSV files on first run. CSV data files are i
 
 | Model | Accuracy | AUC | 5-Fold CV |
 |-------|----------|-----|-----------|
-| **Random Forest** | **84.06%** | 0.9755 | 84.40% ±0.42% |
-| Logistic Regression | 84.90% | 0.9734 | 84.15% ±0.99% |
-| Gradient Boosting | 83.44% | 0.9685 | 83.26% ±0.78% |
-| LDA | 82.60% | 0.9677 | 82.40% ±0.66% |
-| Naive Bayes | 80.78% | 0.9597 | 80.37% ±0.44% |
+| **Logistic Regression** | **85.66%** | 0.9756 | 84.75% ±0.83% |
+| Random Forest | 85.47% | 0.9764 | 85.08% ±0.92% |
+| Gradient Boosting | 84.30% | 0.9696 | 84.11% ±1.10% |
+| LDA | 83.80% | 0.9712 | 82.96% ±0.53% |
+| Naive Bayes | 60.58% | 0.9049 | 57.70% ±10.02% |
 
-*Metrics from DS5110 class (Ch4, Week 6) and cited literature. Model accuracy (~80-85%) aligns with published ML studies on real ESI data (70-80%). Dataset uses 30% nurse variability to match real-world triage disagreement rates.*
+*Metrics from DS5110 class (Ch4, Week 6) and cited literature. Model accuracy (~84-86%) aligns with published ML studies on real ESI data (70-80%). Dataset uses 30% nurse variability to match real-world triage disagreement rates.*
 
 ### Regression Models
 

@@ -98,11 +98,11 @@ API will be available at `http://localhost:5000`
 
 | Model | Accuracy | AUC | 5-Fold CV |
 |-------|----------|-----|-----------|
-| **Random Forest** | **84.06%** | 0.9755 | 84.40% ±0.42% |
-| Logistic Regression | 84.90% | 0.9734 | 84.15% ±0.99% |
-| Gradient Boosting | 83.44% | 0.9685 | 83.26% ±0.78% |
-| LDA | 82.60% | 0.9677 | 82.40% ±0.66% |
-| Naive Bayes | 80.78% | 0.9597 | 80.37% ±0.44% |
+| **Logistic Regression** | **85.66%** | 0.9756 | 84.75% ±0.83% |
+| Random Forest | 85.47% | 0.9764 | 85.08% ±0.92% |
+| Gradient Boosting | 84.30% | 0.9696 | 84.11% ±1.10% |
+| LDA | 83.80% | 0.9712 | 82.96% ±0.53% |
+| Naive Bayes | 60.58% | 0.9049 | 57.70% ±10.02% |
 
 *Metrics from DS5110 class (Ch4, Week 6). Accuracy (~80-85%) aligns with published ML studies on real ESI data (70-80%). 30% nurse variability matches real-world triage disagreement.*
 
@@ -158,7 +158,8 @@ See `../db_setup.sql` for complete schema.
 - ✅ Integration with frontend
 
 ### Model Performance
-- **Best Classification Accuracy:** 84.06% (Random Forest), AUC: 0.9755
+- **Best Classification Accuracy:** 85.66% (Logistic Regression), AUC: 0.9756
+- **Best AUC:** 0.9764 (Random Forest)
 - **Wait Time R²:** 0.8570
 - **Volume RMSE:** 0.86 patients/hour
 
