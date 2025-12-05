@@ -13,6 +13,7 @@ Course: DS 5110, Fall 2025
 
 import pandas as pd
 import numpy as np
+import sqlite3
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.model_selection import train_test_split, cross_val_score, learning_curve, StratifiedKFold
@@ -36,21 +37,33 @@ print("MODEL VALIDATION - DS5110 Class Methodologies")
 print("=" * 80)
 
 # ============================================================================
-# STEP 1: Load and Prepare Data
+# STEP 1: Load and Prepare Data from Cleaned Database
 # ============================================================================
 print("\n[STEP 1] Loading data...")
 
-encounters = pd.read_csv('../dataset/encounter.csv')
-patients = pd.read_csv('../dataset/patient.csv')
-vitals = pd.read_csv('../dataset/vitals.csv')
-payors = pd.read_csv('../dataset/encounter_payor.csv')
+# Connect to cleaned database
+db_path = '../ed_database.db'
+conn = sqlite3.connect(db_path)
 
-# Feature engineering
-encounters['arrival_ts'] = pd.to_datetime(encounters['arrival_ts'])
-patients['dob'] = pd.to_datetime(patients['dob'])
+# Load tables from cleaned database
+encounters = pd.read_sql_query("SELECT * FROM encounter", conn)
+patients = pd.read_sql_query("SELECT * FROM patient", conn)
+vitals = pd.read_sql_query("SELECT * FROM vitals", conn)
+payors = pd.read_sql_query("SELECT * FROM encounter_payor", conn)
+
+conn.close()
+
+# Feature engineering (handle timestamps from database)
+encounters['arrival_ts'] = pd.to_datetime(encounters['arrival_ts'], errors='coerce')
+patients['dob'] = pd.to_datetime(patients['dob'], errors='coerce')
 df = encounters.merge(patients, on='patient_id', how='left')
-df['patient_age'] = ((df['arrival_ts'] - df['dob']).dt.days / 365.25).astype(int)
 
+# Calculate age with handling for missing values
+df['patient_age'] = ((df['arrival_ts'] - df['dob']).dt.days / 365.25)
+df['patient_age'] = df['patient_age'].fillna(df['patient_age'].median()).astype(int)
+
+# Parse vitals timestamps
+vitals['taken_ts'] = pd.to_datetime(vitals['taken_ts'], errors='coerce')
 first_vitals = vitals.sort_values('taken_ts').groupby('encounter_id').first().reset_index()
 df = df.merge(first_vitals[['encounter_id', 'heart_rate', 'systolic_bp', 'diastolic_bp',
                              'respiratory_rate', 'temperature_c', 'spo2', 'pain_score']],
@@ -68,7 +81,7 @@ classification_features = ['patient_age', 'sex_at_birth', 'arrival_mode', 'chief
     'temperature_c', 'o2_saturation', 'pain_score', 'arrival_hour', 'arrival_day_of_week', 'is_weekend', 'payor_type']
 
 df_clf = df[classification_features + ['esi_level']].dropna()
-df_encoded = pd.get_dummies(df_clf, columns=['sex_at_birth', 'arrival_mode', 'chief_complaint', 'payor_type'], drop_first=True)
+df_encoded = pd.get_dummies(df_clf, columns=['sex_at_birth', 'arrival_mode', 'chief_complaint', 'payor_type'], drop_first=False)
 
 X = df_encoded.drop('esi_level', axis=1)
 y = df_encoded['esi_level']
@@ -179,9 +192,9 @@ for i, esi_level in enumerate(classes):
     axes[0].plot(fpr, tpr, label=f'ESI {esi_level} (AUC = {roc_auc:.3f})')
 
 axes[0].plot([0, 1], [0, 1], 'k--', label='Random')
-axes[0].set_xlabel('False Positive Rate')
-axes[0].set_ylabel('True Positive Rate')
-axes[0].set_title('ROC Curves - Random Forest (One-vs-Rest)')
+axes[0].set_xlabel('False positive rate')
+axes[0].set_ylabel('True positive rate')
+axes[0].set_title('ROC curves - Random forest (one-vs-rest)')
 axes[0].legend(loc='lower right')
 axes[0].grid(True, alpha=0.3)
 
@@ -203,11 +216,11 @@ for name, model in trained_models.items():
 names = list(auc_scores.keys())
 values = list(auc_scores.values())
 axes[1].barh(names, values, color='steelblue')
-axes[1].set_xlabel('Macro-Average AUC')
-axes[1].set_title('Model Comparison - AUC Scores')
-axes[1].set_xlim([0.5, 1.0])
+axes[1].set_xlabel('Macro-average AUC')
+axes[1].set_title('Model comparison - AUC scores')
+axes[1].set_xlim([0.5, 1.05])
 for i, v in enumerate(values):
-    axes[1].text(v + 0.01, i, f'{v:.4f}', va='center')
+    axes[1].text(v - 0.04, i, f'{v:.4f}', va='center', ha='left', color='white', fontweight='bold')
 axes[1].grid(True, alpha=0.3, axis='x')
 
 plt.tight_layout()
@@ -240,9 +253,9 @@ axes[0].fill_between(train_sizes, train_mean - train_std, train_mean + train_std
 axes[0].fill_between(train_sizes, test_mean - test_std, test_mean + test_std, alpha=0.1, color='orange')
 axes[0].plot(train_sizes, train_mean, 'o-', color='blue', label='Training score')
 axes[0].plot(train_sizes, test_mean, 'o-', color='orange', label='Cross-validation score')
-axes[0].set_xlabel('Training Set Size')
+axes[0].set_xlabel('Training set size')
 axes[0].set_ylabel('Accuracy')
-axes[0].set_title('Learning Curve - Random Forest')
+axes[0].set_title('Learning curve - Random forest')
 axes[0].legend(loc='lower right')
 axes[0].grid(True, alpha=0.3)
 
@@ -268,13 +281,17 @@ train_sizes2, train_scores2, test_scores2 = learning_curve(
 )
 
 train_mean2 = train_scores2.mean(axis=1)
+train_std2 = train_scores2.std(axis=1)
 test_mean2 = test_scores2.mean(axis=1)
+test_std2 = test_scores2.std(axis=1)
 
+axes[1].fill_between(train_sizes2, train_mean2 - train_std2, train_mean2 + train_std2, alpha=0.1, color='blue')
+axes[1].fill_between(train_sizes2, test_mean2 - test_std2, test_mean2 + test_std2, alpha=0.1, color='orange')
 axes[1].plot(train_sizes2, train_mean2, 'o-', color='blue', label='Training score')
 axes[1].plot(train_sizes2, test_mean2, 'o-', color='orange', label='Cross-validation score')
-axes[1].set_xlabel('Training Set Size')
+axes[1].set_xlabel('Training set size')
 axes[1].set_ylabel('Accuracy')
-axes[1].set_title('Learning Curve - Logistic Regression')
+axes[1].set_title('Learning curve - Logistic regression')
 axes[1].legend(loc='lower right')
 axes[1].grid(True, alpha=0.3)
 

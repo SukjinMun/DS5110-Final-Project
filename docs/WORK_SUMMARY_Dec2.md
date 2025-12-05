@@ -86,7 +86,7 @@ Applied DS5110 class methodologies:
 
 | Method | Result | Source |
 |--------|--------|--------|
-| Accuracy | 84.06% (RF) | DS5110 Ch4 |
+| Accuracy | 85.66% (Logistic) | DS5110 Ch4 |
 | AUC | 0.9755 | DS5110 Ch4 |
 | 5-Fold CV | 84.40% ±0.42% | DS5110 Week 6 |
 | Precision/Recall | Per-class metrics | DS5110 Ch4 |
@@ -178,17 +178,17 @@ Implements DS5110 class methodologies:
 
 | Model | Accuracy | AUC | 5-Fold CV |
 |-------|----------|-----|-----------|
-| **Random Forest** | **84.06%** | 0.9755 | 84.40% ±0.42% |
-| Logistic Regression | 84.90% | 0.9734 | 84.15% ±0.99% |
-| Gradient Boosting | 83.44% | 0.9685 | 83.26% ±0.78% |
-| LDA | 82.60% | 0.9677 | 82.40% ±0.66% |
-| Naive Bayes | 80.78% | 0.9597 | 80.37% ±0.44% |
+| **Logistic Regression** | **85.66%** | 0.9756 | 84.75% ±0.83% |
+| Random Forest | 85.47% | 0.9764 | 85.08% ±0.92% |
+| Gradient Boosting | 84.30% | 0.9696 | 84.11% ±1.10% |
+| LDA | 83.80% | 0.9712 | 82.96% ±0.53% |
+| Naive Bayes | 60.58% | 0.9049 | 57.70% ±10.02% |
 
 ### Validation Metrics (from DS5110 Class)
 
 | Metric | Value | Source |
 |--------|-------|--------|
-| Accuracy | 84.06% (RF best) | DS5110 Ch4 |
+| Accuracy | 85.66% (Logistic best) | DS5110 Ch4 |
 | AUC | 0.9755 | DS5110 Ch4 |
 | 5-Fold CV | 84.40% ±0.42% | DS5110 Week 6 |
 | Precision (ESI 1) | 92.05% | DS5110 Ch4 |
