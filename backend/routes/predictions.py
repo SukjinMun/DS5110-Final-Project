@@ -98,59 +98,59 @@ def models_info():
 
     return jsonify({
         'classification_models': {
-            'random_forest': {
-                'description': 'Random Forest for ESI prediction (BEST ACCURACY)',
-                'accuracy': '94.06%',
-                'weighted_f1': '0.9401',
-                'macro_recall': '93.05%',
-                'best_for': 'Highest accuracy classification',
+            'logistic_regression': {
+                'description': 'Logistic Regression with SMOTE for ESI prediction (BEST ACCURACY)',
+                'accuracy': '85.66%',
+                'auc': '0.9756',
+                'cv_accuracy': '84.75% ±0.83%',
+                'best_for': 'Highest accuracy classification with excellent generalization',
                 'endpoint': '/api/predictions/esi'
             },
-            'logistic_regression': {
-                'description': 'Logistic Regression with SMOTE for ESI prediction',
-                'accuracy': '93.44%',
-                'weighted_f1': '0.9350',
-                'macro_recall': '93.73%',
-                'best_for': 'Best recall for critical ESI levels',
+            'random_forest': {
+                'description': 'Random Forest for ESI prediction (BEST AUC)',
+                'accuracy': '85.47%',
+                'auc': '0.9764',
+                'cv_accuracy': '85.08% ±0.92%',
+                'best_for': 'Best AUC score and discrimination ability',
                 'endpoint': '/api/predictions/esi'
             },
             'gradient_boosting': {
                 'description': 'Gradient Boosting for ESI prediction',
-                'accuracy': '93.28%',
-                'weighted_f1': '0.9326',
-                'macro_recall': '93.00%',
+                'accuracy': '84.30%',
+                'auc': '0.9696',
+                'cv_accuracy': '84.11% ±1.10%',
                 'best_for': 'Strong accuracy with good generalization',
                 'endpoint': '/api/predictions/esi'
             },
             'lda': {
                 'description': 'Linear Discriminant Analysis with SMOTE for ESI prediction',
-                'accuracy': '90.16%',
-                'weighted_f1': '0.9026',
-                'macro_recall': '91.96%',
-                'best_for': 'Probabilistic classification with balanced recall',
+                'accuracy': '83.80%',
+                'auc': '0.9712',
+                'cv_accuracy': '82.96% ±0.53%',
+                'best_for': 'Probabilistic classification with low variance',
                 'endpoint': '/api/predictions/esi'
             },
             'naive_bayes': {
                 'description': 'Gaussian Naive Bayes with SMOTE for ESI prediction',
-                'accuracy': '90.16%',
-                'weighted_f1': '0.9019',
-                'macro_recall': '90.72%',
-                'best_for': 'Fast predictions',
+                'accuracy': '60.58%',
+                'auc': '0.9049',
+                'cv_accuracy': '57.70% ±10.02%',
+                'best_for': 'Fast predictions (lower accuracy)',
                 'endpoint': '/api/predictions/esi'
             }
         },
         'regression_models': {
             'wait_time': {
                 'description': 'Linear regression for wait time prediction',
-                'r2_score': '0.8463',
-                'rmse': '13.63 minutes',
-                'mae': '10.87 minutes',
+                'r2_score': '0.857',
+                'rmse': '14.17 minutes',
+                'mae': '11.32 minutes',
                 'endpoint': '/api/predictions/wait-time'
             },
             'volume': {
                 'description': 'Poisson GLM for patient volume forecasting',
-                'rmse': '0.84 patients/hour',
-                'mae': '0.66 patients/hour',
+                'rmse': '0.86 patients/hour',
+                'mae': '0.67 patients/hour',
                 'endpoint': '/api/predictions/volume'
             }
         },
