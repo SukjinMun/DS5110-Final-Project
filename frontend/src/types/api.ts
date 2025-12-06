@@ -68,6 +68,9 @@ export interface EncounterListResponse {
   total: number
   limit: number
   offset: number
+  sort_by?: string
+  sort_order?: string
+  search?: string
   data: Encounter[]
 }
 
@@ -177,4 +180,60 @@ export interface VolumeForecastResponse {
     is_weekend: boolean
   }
   interpretation: string
+}
+
+export interface WaitTimeData {
+  encounter_id: number
+  esi_level: number
+  arrival_ts: string
+  provider_start_ts: string
+  wait_time_minutes: number
+}
+
+export interface WaitTimesResponse {
+  total: number
+  statistics: {
+    average_wait_minutes: number
+    min_wait_minutes: number
+    max_wait_minutes: number
+  }
+  wait_times: WaitTimeData[]
+}
+
+export interface WaitTimeByEsiItem {
+  esi_level: number
+  count: number
+  average_wait_minutes: number
+  min_wait_minutes: number
+  max_wait_minutes: number
+  median_wait_minutes: number
+}
+
+export interface WaitTimesByEsiResponse {
+  wait_times_by_esi: WaitTimeByEsiItem[]
+}
+
+export interface LengthOfStayResponse {
+  total_encounters: number
+  overall_statistics: {
+    average_los_minutes: number
+    min_los_minutes: number
+    max_los_minutes: number
+    median_los_minutes: number
+  }
+  los_by_esi: Array<{
+    esi_level: number
+    count: number
+    average_los_minutes: number
+    min_los_minutes: number
+    max_los_minutes: number
+    median_los_minutes: number
+  }>
+  los_by_disposition: Array<{
+    disposition_code: string
+    count: number
+    average_los_minutes: number
+    min_los_minutes: number
+    max_los_minutes: number
+  }>
 }

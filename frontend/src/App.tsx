@@ -8,10 +8,10 @@ import { fetchHealth } from './lib/api'
 import './App.css'
 
 const routes = [
-  { path: '/', label: 'Dashboard' },
-  { path: '/encounters', label: 'Encounters' },
-  { path: '/predictions', label: 'Predictions' },
-  { path: '/staff', label: 'Staff & Resources' },
+  { path: '/', label: 'Dashboard', icon: '📊' },
+  { path: '/encounters', label: 'Encounters', icon: '🏥' },
+  { path: '/predictions', label: 'Predictions', icon: '🔮' },
+  { path: '/staff', label: 'Staff & Resources', icon: '👥' },
 ]
 
 function App() {
@@ -26,7 +26,7 @@ function App() {
       <aside className="sidebar">
         <div className="brand">
           <p className="eyebrow">NU DS5110 | Team 22</p>
-          <h1>ED Ops Command</h1>
+          <h1>Emergency Department Analysis System</h1>
         </div>
         <nav>
           {routes.map((route) => (
@@ -36,7 +36,8 @@ function App() {
               className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}
               end={route.path === '/'}
             >
-              {route.label}
+              <span className="nav-icon">{route.icon}</span>
+              <span className="nav-label">{route.label}</span>
             </NavLink>
           ))}
         </nav>
