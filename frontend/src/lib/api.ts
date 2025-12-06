@@ -1,11 +1,13 @@
 import axios from 'axios'
 import type {
   DiagnosisResponse,
+  Encounter,
   EncounterListResponse,
   EsiPredictionRequest,
   EsiPredictionResponse,
   EsiStatisticsResponse,
   HealthStatus,
+  LengthOfStayResponse,
   OverviewResponse,
   PayorResponse,
   PredictionModelsResponse,
@@ -14,6 +16,8 @@ import type {
   VolumeForecastResponse,
   WaitTimeFeatures,
   WaitTimeResponse,
+  WaitTimesByEsiResponse,
+  WaitTimesResponse,
 } from '../types/api'
 
 const baseURL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5001/api'
@@ -34,12 +38,28 @@ export const fetchDiagnoses = () => extractData<DiagnosisResponse>(apiClient.get
 export const fetchPredictionMetadata = () =>
   extractData<PredictionModelsResponse>(apiClient.get('/predictions/models/info'))
 
-export const fetchEncounters = (params: { esi_level?: number; limit?: number; offset?: number } = {}) =>
+export const fetchEncounters = (params: { 
+  esi_level?: number
+  limit?: number
+  offset?: number
+  search?: string
+  sort_by?: string
+  sort_order?: 'asc' | 'desc'
+} = {}) =>
   extractData<EncounterListResponse>(
     apiClient.get('/encounters', {
       params,
     }),
   )
+
+export const createEncounter = (encounter: Partial<Encounter>) =>
+  extractData<{ message: string; encounter: Encounter }>(apiClient.post('/encounters', encounter))
+
+export const updateEncounter = (encounterId: number, encounter: Partial<Encounter>) =>
+  extractData<{ message: string; encounter: Encounter }>(apiClient.put(`/encounters/${encounterId}`, encounter))
+
+export const deleteEncounter = (encounterId: number) =>
+  extractData<{ message: string }>(apiClient.delete(`/encounters/${encounterId}`))
 
 export const fetchStaff = (activeOnly: boolean) =>
   extractData<StaffResponse>(
@@ -65,3 +85,16 @@ export const predictVolume = (params: {
       params,
     }),
   )
+
+export const fetchWaitTimes = (params: { esi_level?: number } = {}) =>
+  extractData<WaitTimesResponse>(
+    apiClient.get('/wait-times', {
+      params,
+    }),
+  )
+
+export const fetchWaitTimesByEsi = () =>
+  extractData<WaitTimesByEsiResponse>(apiClient.get('/statistics/wait-times-by-esi'))
+
+export const fetchLengthOfStay = () =>
+  extractData<LengthOfStayResponse>(apiClient.get('/statistics/length-of-stay'))

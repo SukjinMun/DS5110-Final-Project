@@ -6,6 +6,8 @@ import {
   fetchVitals,
   fetchPayorStats,
   fetchDiagnoses,
+  fetchWaitTimesByEsi,
+  fetchLengthOfStay,
 } from '../lib/api'
 import type { EsiDistributionBreakdown } from '../types/api'
 import {
@@ -19,6 +21,12 @@ import {
   XAxis,
   YAxis,
   Cell,
+  Legend,
+  Line,
+  LineChart,
+  ComposedChart,
+  RadialBarChart,
+  RadialBar,
 } from 'recharts'
 
 const chartPalette = ['#2563eb', '#7c3aed', '#059669', '#ea580c', '#facc15']
@@ -33,6 +41,8 @@ const DashboardPage = () => {
   const { data: vitals } = useQuery({ queryKey: ['vitals'], queryFn: fetchVitals })
   const { data: payors } = useQuery({ queryKey: ['payors'], queryFn: fetchPayorStats })
   const { data: diagnoses } = useQuery({ queryKey: ['diagnoses'], queryFn: fetchDiagnoses })
+  const { data: waitTimesByEsi } = useQuery({ queryKey: ['wait-times-by-esi'], queryFn: fetchWaitTimesByEsi })
+  const { data: lengthOfStay } = useQuery({ queryKey: ['length-of-stay'], queryFn: fetchLengthOfStay })
 
   const loading = overviewLoading || !overview
   const error = overviewError
@@ -45,6 +55,59 @@ const DashboardPage = () => {
   )
 
   const lwbsRows = useMemo(() => esiStats?.esi_statistics ?? [], [esiStats])
+  
+  // Prepare LWBS chart data
+  const lwbsChartData = useMemo(
+    () =>
+      lwbsRows.map((row) => ({
+        esi_level: `ESI ${row.esi_level}`,
+        total: row.total_count,
+        lwbs: row.lwbs_count,
+        lwbs_rate: (row.lwbs_rate * 100).toFixed(1),
+      })),
+    [lwbsRows],
+  )
+
+  // Prepare wait times chart data
+  const waitTimesChartData = useMemo(
+    () =>
+      waitTimesByEsi?.wait_times_by_esi.map((item) => ({
+        esi_level: `ESI ${item.esi_level}`,
+        average: item.average_wait_minutes,
+        median: item.median_wait_minutes,
+        min: item.min_wait_minutes,
+        max: item.max_wait_minutes,
+        count: item.count,
+      })) ?? [],
+    [waitTimesByEsi],
+  )
+
+  // Prepare LOS chart data
+  const losChartData = useMemo(
+    () =>
+      lengthOfStay?.los_by_esi.map((item) => ({
+        esi_level: `ESI ${item.esi_level}`,
+        average: item.average_los_minutes,
+        median: item.median_los_minutes,
+        min: item.min_los_minutes,
+        max: item.max_los_minutes,
+        count: item.count,
+      })) ?? [],
+    [lengthOfStay],
+  )
+
+  // Prepare top diagnoses chart data for horizontal bar chart (sorted by count, highest first)
+  const diagnosesChartData = useMemo(
+    () =>
+      diagnoses?.top_diagnoses
+        .map((dx, index) => ({
+          code: dx.code,
+          count: dx.count,
+          fill: chartPalette[index % chartPalette.length],
+        }))
+        .sort((a, b) => b.count - a.count) ?? [],
+    [diagnoses],
+  )
 
   if (error) {
     return <div className="panel">Unable to load dashboard: {(error as Error).message}</div>
@@ -155,45 +218,163 @@ const DashboardPage = () => {
             <h3>ESI-level safety signals</h3>
             <p className="subtle">Left Without Being Seen (LWBS) rate per level</p>
           </header>
-          <div className="table-scroll">
-            <table>
-              <thead>
-                <tr>
-                  <th>ESI</th>
-                  <th>Total</th>
-                  <th>LWBS</th>
-                  <th>Rate</th>
-                </tr>
-              </thead>
-              <tbody>
-                {lwbsRows.map((row: EsiDistributionBreakdown) => (
-                  <tr key={row.esi_level}>
-                    <td>Level {row.esi_level}</td>
-                    <td>{row.total_count.toLocaleString()}</td>
-                    <td>{row.lwbs_count.toLocaleString()}</td>
-                    <td>{(row.lwbs_rate * 100).toFixed(1)}%</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ResponsiveContainer width="100%" height={260}>
+            <ComposedChart data={lwbsChartData}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="esi_level" />
+              <YAxis yAxisId="left" allowDecimals={false} />
+              <YAxis yAxisId="right" orientation="right" allowDecimals={false} />
+              <Tooltip
+                formatter={(value: number, name: string) => {
+                  if (name === 'lwbs_rate') return `${value}%`
+                  return value.toLocaleString()
+                }}
+              />
+              <Legend />
+              <Bar yAxisId="left" dataKey="total" fill="#2563eb" name="Total Encounters" radius={4} />
+              <Bar yAxisId="left" dataKey="lwbs" fill="#ea580c" name="LWBS Count" radius={4} />
+              <Line
+                yAxisId="right"
+                type="monotone"
+                dataKey="lwbs_rate"
+                stroke="#facc15"
+                strokeWidth={2}
+                name="LWBS Rate %"
+                dot={{ r: 4 }}
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
         </section>
 
         <section className="panel">
           <header>
             <h3>Top diagnoses</h3>
-            <p className="subtle">Primary codes across encounters</p>
+            <p className="subtle">Primary codes across encounters (sorted by count)</p>
           </header>
-          <ol className="diagnosis-list">
-            {diagnoses?.top_diagnoses.map((dx) => (
-              <li key={dx.code}>
-                <span>{dx.code}</span>
-                <strong>{dx.count}</strong>
-              </li>
-            ))}
-          </ol>
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={diagnosesChartData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+              <defs>
+                {diagnosesChartData.map((entry, index) => (
+                  <linearGradient key={`gradient-${index}`} id={`diagnosisGradient-${index}`} x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stopColor={entry.fill} stopOpacity={0.9} />
+                    <stop offset="100%" stopColor={entry.fill} stopOpacity={0.6} />
+                  </linearGradient>
+                ))}
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#e5e7eb" />
+              <XAxis type="number" allowDecimals={false} tick={{ fill: '#6b7280', fontSize: 11 }} />
+              <YAxis 
+                dataKey="code" 
+                type="category" 
+                width={80}
+                tick={{ fill: '#6b7280', fontSize: 11 }}
+                axisLine={{ stroke: '#d1d5db' }}
+              />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '8px',
+                  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+                }}
+                formatter={(value: number) => [`${value.toLocaleString()} encounters`, 'Count']}
+                labelFormatter={(label) => `Diagnosis: ${label}`}
+              />
+              <Bar 
+                dataKey="count" 
+                radius={[0, 8, 8, 0]}
+                animationDuration={800}
+              >
+                {diagnosesChartData.map((entry, index) => (
+                  <Cell 
+                    key={`cell-${index}`} 
+                    fill={`url(#diagnosisGradient-${index})`}
+                  />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
         </section>
       </div>
+
+      <div className="grid two">
+        <section className="panel">
+          <header>
+            <h3>Wait times by ESI level</h3>
+            <p className="subtle">Average time from arrival to provider</p>
+          </header>
+          <ResponsiveContainer width="100%" height={300}>
+            <ComposedChart data={waitTimesChartData}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="esi_level" />
+              <YAxis label={{ value: 'Minutes', angle: -90, position: 'insideLeft' }} />
+              <Tooltip
+                formatter={(value: number) => `${value.toFixed(1)} min`}
+                labelFormatter={(label) => label}
+              />
+              <Legend />
+              <Bar dataKey="average" fill="#2563eb" name="Average" radius={4} />
+              <Bar dataKey="median" fill="#7c3aed" name="Median" radius={4} />
+              <Line type="monotone" dataKey="min" stroke="#059669" strokeWidth={2} name="Min" dot={{ r: 3 }} />
+              <Line type="monotone" dataKey="max" stroke="#ea580c" strokeWidth={2} name="Max" dot={{ r: 3 }} />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </section>
+
+        <section className="panel">
+          <header>
+            <h3>Length of stay by ESI level</h3>
+            <p className="subtle">Time from arrival to departure</p>
+          </header>
+          <ResponsiveContainer width="100%" height={300}>
+            <ComposedChart data={losChartData}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="esi_level" />
+              <YAxis label={{ value: 'Minutes', angle: -90, position: 'insideLeft' }} />
+              <Tooltip
+                formatter={(value: number) => `${value.toFixed(1)} min`}
+                labelFormatter={(label) => label}
+              />
+              <Legend />
+              <Bar dataKey="average" fill="#2563eb" name="Average" radius={4} />
+              <Bar dataKey="median" fill="#7c3aed" name="Median" radius={4} />
+              <Line type="monotone" dataKey="min" stroke="#059669" strokeWidth={2} name="Min" dot={{ r: 3 }} />
+              <Line type="monotone" dataKey="max" stroke="#ea580c" strokeWidth={2} name="Max" dot={{ r: 3 }} />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </section>
+      </div>
+
+      {lengthOfStay && (
+        <section className="panel">
+          <header>
+            <h3>Overall length of stay statistics</h3>
+            <p className="subtle">Total encounters: {lengthOfStay.total_encounters.toLocaleString()}</p>
+          </header>
+          <div className="kpi-grid">
+            <div>
+              <p className="eyebrow">Average LOS</p>
+              <h2>{(lengthOfStay.overall_statistics.average_los_minutes / 60).toFixed(1)} hours</h2>
+              <p className="subtle">{lengthOfStay.overall_statistics.average_los_minutes.toFixed(1)} minutes</p>
+            </div>
+            <div>
+              <p className="eyebrow">Median LOS</p>
+              <h2>{(lengthOfStay.overall_statistics.median_los_minutes / 60).toFixed(1)} hours</h2>
+              <p className="subtle">{lengthOfStay.overall_statistics.median_los_minutes.toFixed(1)} minutes</p>
+            </div>
+            <div>
+              <p className="eyebrow">Min LOS</p>
+              <h2>{(lengthOfStay.overall_statistics.min_los_minutes / 60).toFixed(1)} hours</h2>
+              <p className="subtle">{lengthOfStay.overall_statistics.min_los_minutes.toFixed(1)} minutes</p>
+            </div>
+            <div>
+              <p className="eyebrow">Max LOS</p>
+              <h2>{(lengthOfStay.overall_statistics.max_los_minutes / 60).toFixed(1)} hours</h2>
+              <p className="subtle">{lengthOfStay.overall_statistics.max_los_minutes.toFixed(1)} minutes</p>
+            </div>
+          </div>
+        </section>
+      )}
     </div>
   )
 }

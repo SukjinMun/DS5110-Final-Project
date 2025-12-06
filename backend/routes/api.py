@@ -5,7 +5,7 @@ Provides RESTful API for frontend and statistical analysis.
 """
 
 from flask import Blueprint, jsonify, request
-from sqlalchemy import func, desc
+from sqlalchemy import func, desc, text
 from functools import wraps
 from config.database import get_session, db_session
 from models.orm_models import Patient, Staff, Encounter, EncounterPayor, Vitals, Diagnosis, StaffAssignment
@@ -38,7 +38,7 @@ def health_check():
 @api_bp.route('/encounters', methods=['GET'])
 @with_session
 def get_encounters():
-    """Get all encounters with optional filtering"""
+    """Get all encounters with optional filtering, search, and sorting"""
     session = get_session()
     try:
         # Query parameters for filtering
@@ -46,6 +46,13 @@ def get_encounters():
         disposition = request.args.get('disposition')
         limit = request.args.get('limit', default=100, type=int)
         offset = request.args.get('offset', default=0, type=int)
+        
+        # Search parameter
+        search = request.args.get('search', type=str)
+        
+        # Sort parameters
+        sort_by = request.args.get('sort_by', default='encounter_id', type=str)
+        sort_order = request.args.get('sort_order', default='asc', type=str)
 
         query = session.query(Encounter)
 
@@ -54,17 +61,102 @@ def get_encounters():
             query = query.filter(Encounter.esi_level == esi_level)
         if disposition:
             query = query.filter(Encounter.disposition_code == disposition)
+        
+        # Apply search (searches across multiple fields)
+        if search:
+            search_term = f'%{search}%'
+            # Use text() for casting to string in SQLite
+            query = query.filter(
+                (Encounter.chief_complaint.like(search_term)) |
+                (Encounter.disposition_code.like(search_term)) |
+                (Encounter.arrival_mode.like(search_term)) |
+                (Encounter.referral_code.like(search_term)) |
+                (Encounter.notes.like(search_term)) |
+                (text(f"CAST(encounter.encounter_id AS TEXT)").like(search_term)) |
+                (text(f"CAST(encounter.patient_id AS TEXT)").like(search_term))
+            )
 
-        # Pagination
+        # Apply sorting
+        sort_column = None
+        valid_sort_columns = {
+            'encounter_id': Encounter.encounter_id,
+            'patient_id': Encounter.patient_id,
+            'arrival_ts': Encounter.arrival_ts,
+            'esi_level': Encounter.esi_level,
+            'chief_complaint': Encounter.chief_complaint,
+            'disposition_code': Encounter.disposition_code,
+            'departure_ts': Encounter.departure_ts,
+        }
+        
+        if sort_by in valid_sort_columns:
+            sort_column = valid_sort_columns[sort_by]
+        else:
+            sort_column = Encounter.encounter_id  # Default sort
+        
+        if sort_order.lower() == 'desc':
+            query = query.order_by(desc(sort_column))
+        else:
+            query = query.order_by(sort_column)
+
+        # Get total count before pagination
         total = query.count()
+        
+        # Apply pagination
         encounters = query.limit(limit).offset(offset).all()
 
         return jsonify({
             'total': total,
             'limit': limit,
             'offset': offset,
+            'sort_by': sort_by,
+            'sort_order': sort_order,
+            'search': search,
             'data': [enc.to_dict() for enc in encounters]
         })
+    finally:
+        session.close()
+
+@api_bp.route('/encounters', methods=['POST'])
+@with_session
+def create_encounter():
+    """Create a new encounter"""
+    session = get_session()
+    try:
+        data = request.get_json()
+        
+        # Validate required fields
+        if 'patient_id' not in data:
+            return jsonify({'error': 'patient_id is required'}), 400
+        
+        # Create new encounter
+        encounter = Encounter(
+            patient_id=data['patient_id'],
+            arrival_ts=data.get('arrival_ts'),
+            triage_start_ts=data.get('triage_start_ts'),
+            triage_end_ts=data.get('triage_end_ts'),
+            provider_start_ts=data.get('provider_start_ts'),
+            dispo_decision_ts=data.get('dispo_decision_ts'),
+            departure_ts=data.get('departure_ts'),
+            arrival_mode=data.get('arrival_mode'),
+            chief_complaint=data.get('chief_complaint'),
+            esi_level=data.get('esi_level'),
+            disposition_code=data.get('disposition_code'),
+            referral_code=data.get('referral_code'),
+            left_without_being_seen=data.get('left_without_being_seen', 0),
+            notes=data.get('notes')
+        )
+        
+        session.add(encounter)
+        session.commit()
+        session.refresh(encounter)
+        
+        return jsonify({
+            'message': 'Encounter created successfully',
+            'encounter': encounter.to_dict()
+        }), 201
+    except Exception as e:
+        session.rollback()
+        return jsonify({'error': str(e)}), 400
     finally:
         session.close()
 
@@ -92,6 +184,91 @@ def get_encounter_detail(encounter_id):
             'diagnoses': [d.to_dict() for d in diagnoses],
             'staff_assignments': [s.to_dict() for s in staff]
         })
+    finally:
+        session.close()
+
+@api_bp.route('/encounters/<int:encounter_id>', methods=['PUT'])
+@with_session
+def update_encounter(encounter_id):
+    """Update an existing encounter"""
+    session = get_session()
+    try:
+        encounter = session.query(Encounter).filter(Encounter.encounter_id == encounter_id).first()
+        
+        if not encounter:
+            return jsonify({'error': 'Encounter not found'}), 404
+        
+        data = request.get_json()
+        
+        # Update fields if provided
+        if 'patient_id' in data:
+            encounter.patient_id = data['patient_id']
+        if 'arrival_ts' in data:
+            encounter.arrival_ts = data['arrival_ts']
+        if 'triage_start_ts' in data:
+            encounter.triage_start_ts = data['triage_start_ts']
+        if 'triage_end_ts' in data:
+            encounter.triage_end_ts = data['triage_end_ts']
+        if 'provider_start_ts' in data:
+            encounter.provider_start_ts = data['provider_start_ts']
+        if 'dispo_decision_ts' in data:
+            encounter.dispo_decision_ts = data['dispo_decision_ts']
+        if 'departure_ts' in data:
+            encounter.departure_ts = data['departure_ts']
+        if 'arrival_mode' in data:
+            encounter.arrival_mode = data['arrival_mode']
+        if 'chief_complaint' in data:
+            encounter.chief_complaint = data['chief_complaint']
+        if 'esi_level' in data:
+            encounter.esi_level = data['esi_level']
+        if 'disposition_code' in data:
+            encounter.disposition_code = data['disposition_code']
+        if 'referral_code' in data:
+            encounter.referral_code = data['referral_code']
+        if 'left_without_being_seen' in data:
+            encounter.left_without_being_seen = data['left_without_being_seen']
+        if 'notes' in data:
+            encounter.notes = data['notes']
+        
+        session.commit()
+        session.refresh(encounter)
+        
+        return jsonify({
+            'message': 'Encounter updated successfully',
+            'encounter': encounter.to_dict()
+        })
+    except Exception as e:
+        session.rollback()
+        return jsonify({'error': str(e)}), 400
+    finally:
+        session.close()
+
+@api_bp.route('/encounters/<int:encounter_id>', methods=['DELETE'])
+@with_session
+def delete_encounter(encounter_id):
+    """Delete an encounter"""
+    session = get_session()
+    try:
+        encounter = session.query(Encounter).filter(Encounter.encounter_id == encounter_id).first()
+        
+        if not encounter:
+            return jsonify({'error': 'Encounter not found'}), 404
+        
+        # Delete related records first (if cascade delete is not set up)
+        session.query(EncounterPayor).filter(EncounterPayor.encounter_id == encounter_id).delete()
+        session.query(Vitals).filter(Vitals.encounter_id == encounter_id).delete()
+        session.query(Diagnosis).filter(Diagnosis.encounter_id == encounter_id).delete()
+        session.query(StaffAssignment).filter(StaffAssignment.encounter_id == encounter_id).delete()
+        
+        session.delete(encounter)
+        session.commit()
+        
+        return jsonify({
+            'message': 'Encounter deleted successfully'
+        })
+    except Exception as e:
+        session.rollback()
+        return jsonify({'error': str(e)}), 400
     finally:
         session.close()
 
@@ -301,8 +478,224 @@ def get_staff():
         'staff': [s.to_dict() for s in staff]
     })
 
-# Note: Wait time endpoints will be implemented after date format is fixed
-# Endpoints to be added:
-# - /api/wait-times
-# - /api/statistics/wait-times-by-esi
-# - /api/statistics/length-of-stay
+@api_bp.route('/wait-times', methods=['GET'])
+@with_session
+def get_wait_times():
+    """Get wait time data for encounters
+    
+    Returns wait times (arrival to provider) for encounters with valid timestamps.
+    Supports optional filtering by ESI level.
+    """
+    session = get_session()
+    try:
+        esi_level = request.args.get('esi_level', type=int)
+        
+        # Build query to calculate wait times using raw SQL with julianday
+        # Wait time = (provider_start_ts - arrival_ts) in minutes
+        base_query = """
+            SELECT 
+                encounter_id,
+                esi_level,
+                arrival_ts,
+                provider_start_ts,
+                CAST((julianday(provider_start_ts) - julianday(arrival_ts)) * 1440 AS INTEGER) AS wait_time_minutes
+            FROM encounter
+            WHERE arrival_ts IS NOT NULL AND arrival_ts != ''
+              AND provider_start_ts IS NOT NULL AND provider_start_ts != ''
+        """
+        
+        if esi_level:
+            base_query += f" AND esi_level = {esi_level}"
+        
+        results = session.execute(text(base_query)).fetchall()
+        
+        wait_times = []
+        for row in results:
+            wait_times.append({
+                'encounter_id': row[0],
+                'esi_level': row[1],
+                'arrival_ts': row[2],
+                'provider_start_ts': row[3],
+                'wait_time_minutes': row[4]
+            })
+        
+        # Calculate statistics
+        if wait_times:
+            wait_time_values = [wt['wait_time_minutes'] for wt in wait_times if wt['wait_time_minutes'] is not None]
+            avg_wait = sum(wait_time_values) / len(wait_time_values) if wait_time_values else 0
+            min_wait = min(wait_time_values) if wait_time_values else 0
+            max_wait = max(wait_time_values) if wait_time_values else 0
+        else:
+            avg_wait = min_wait = max_wait = 0
+        
+        return jsonify({
+            'total': len(wait_times),
+            'statistics': {
+                'average_wait_minutes': round(avg_wait, 2),
+                'min_wait_minutes': min_wait,
+                'max_wait_minutes': max_wait
+            },
+            'wait_times': wait_times
+        })
+    finally:
+        session.close()
+
+@api_bp.route('/statistics/wait-times-by-esi', methods=['GET'])
+@with_session
+def get_wait_times_by_esi():
+    """Get wait time statistics grouped by ESI level"""
+    session = get_session()
+    try:
+        esi_stats = []
+        
+        for esi in range(1, 6):
+            # Calculate wait times for this ESI level using raw SQL
+            query = text("""
+                SELECT CAST((julianday(provider_start_ts) - julianday(arrival_ts)) * 1440 AS INTEGER) AS wait_time_minutes
+                FROM encounter
+                WHERE esi_level = :esi_level
+                  AND arrival_ts IS NOT NULL AND arrival_ts != ''
+                  AND provider_start_ts IS NOT NULL AND provider_start_ts != ''
+            """)
+            results = session.execute(query, {'esi_level': esi}).fetchall()
+            
+            if results:
+                wait_times = [r[0] for r in results if r[0] is not None]
+                if wait_times:
+                    esi_stats.append({
+                        'esi_level': esi,
+                        'count': len(wait_times),
+                        'average_wait_minutes': round(sum(wait_times) / len(wait_times), 2),
+                        'min_wait_minutes': min(wait_times),
+                        'max_wait_minutes': max(wait_times),
+                        'median_wait_minutes': round(sorted(wait_times)[len(wait_times) // 2], 2)
+                    })
+                else:
+                    esi_stats.append({
+                        'esi_level': esi,
+                        'count': 0,
+                        'average_wait_minutes': 0,
+                        'min_wait_minutes': 0,
+                        'max_wait_minutes': 0,
+                        'median_wait_minutes': 0
+                    })
+            else:
+                esi_stats.append({
+                    'esi_level': esi,
+                    'count': 0,
+                    'average_wait_minutes': 0,
+                    'min_wait_minutes': 0,
+                    'max_wait_minutes': 0,
+                    'median_wait_minutes': 0
+                })
+        
+        return jsonify({
+            'wait_times_by_esi': esi_stats
+        })
+    finally:
+        session.close()
+
+@api_bp.route('/statistics/length-of-stay', methods=['GET'])
+@with_session
+def get_length_of_stay():
+    """Get length of stay statistics
+    
+    Length of stay = (departure_ts - arrival_ts) in minutes
+    """
+    session = get_session()
+    try:
+        # Calculate LOS for all encounters with valid timestamps using raw SQL
+        query = text("""
+            SELECT 
+                encounter_id,
+                esi_level,
+                disposition_code,
+                arrival_ts,
+                departure_ts,
+                CAST((julianday(departure_ts) - julianday(arrival_ts)) * 1440 AS INTEGER) AS los_minutes
+            FROM encounter
+            WHERE arrival_ts IS NOT NULL AND arrival_ts != ''
+              AND departure_ts IS NOT NULL AND departure_ts != ''
+        """)
+        results = session.execute(query).fetchall()
+        
+        los_data = []
+        for row in results:
+            los_data.append({
+                'encounter_id': row[0],
+                'esi_level': row[1],
+                'disposition_code': row[2],
+                'arrival_ts': row[3],
+                'departure_ts': row[4],
+                'los_minutes': row[5]
+            })
+        
+        # Calculate overall statistics
+        if los_data:
+            los_values = [los['los_minutes'] for los in los_data if los['los_minutes'] is not None]
+            if los_values:
+                avg_los = sum(los_values) / len(los_values)
+                min_los = min(los_values)
+                max_los = max(los_values)
+                sorted_los = sorted(los_values)
+                median_los = sorted_los[len(sorted_los) // 2]
+            else:
+                avg_los = min_los = max_los = median_los = 0
+        else:
+            avg_los = min_los = max_los = median_los = 0
+        
+        # Calculate LOS by ESI level
+        los_by_esi = []
+        for esi in range(1, 6):
+            esi_los = [los['los_minutes'] for los in los_data 
+                      if los['esi_level'] == esi and los['los_minutes'] is not None]
+            if esi_los:
+                los_by_esi.append({
+                    'esi_level': esi,
+                    'count': len(esi_los),
+                    'average_los_minutes': round(sum(esi_los) / len(esi_los), 2),
+                    'min_los_minutes': min(esi_los),
+                    'max_los_minutes': max(esi_los),
+                    'median_los_minutes': round(sorted(esi_los)[len(esi_los) // 2], 2)
+                })
+            else:
+                los_by_esi.append({
+                    'esi_level': esi,
+                    'count': 0,
+                    'average_los_minutes': 0,
+                    'min_los_minutes': 0,
+                    'max_los_minutes': 0,
+                    'median_los_minutes': 0
+                })
+        
+        # Calculate LOS by disposition
+        los_by_disposition = {}
+        for los in los_data:
+            if los['disposition_code'] and los['los_minutes'] is not None:
+                if los['disposition_code'] not in los_by_disposition:
+                    los_by_disposition[los['disposition_code']] = []
+                los_by_disposition[los['disposition_code']].append(los['los_minutes'])
+        
+        disposition_stats = []
+        for disposition, values in los_by_disposition.items():
+            disposition_stats.append({
+                'disposition_code': disposition,
+                'count': len(values),
+                'average_los_minutes': round(sum(values) / len(values), 2),
+                'min_los_minutes': min(values),
+                'max_los_minutes': max(values)
+            })
+        
+        return jsonify({
+            'total_encounters': len(los_data),
+            'overall_statistics': {
+                'average_los_minutes': round(avg_los, 2),
+                'min_los_minutes': min_los,
+                'max_los_minutes': max_los,
+                'median_los_minutes': round(median_los, 2)
+            },
+            'los_by_esi': los_by_esi,
+            'los_by_disposition': disposition_stats
+        })
+    finally:
+        session.close()

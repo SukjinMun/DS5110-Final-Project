@@ -116,39 +116,180 @@ const PredictionsPage = () => {
       <section className="panel">
         <header>
           <h2>Model card overview</h2>
-          <p className="subtle">Served from /api/predictions/models/info</p>
+          <p className="subtle">Machine learning models available for predictions</p>
         </header>
         {modelMeta ? (
-          <div className="grid two">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+            {/* Classification Models Section */}
             <div>
-              <h3>Classification models</h3>
-              <ul className="model-list">
+              <h3 style={{ marginBottom: '16px', fontSize: '18px', fontWeight: 600, color: '#111827' }}>
+                Classification Models
+              </h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
                 {Object.entries(modelMeta.classification_models).map(([key, meta]) => (
-                  <li key={key}>
-                    <strong>{key}</strong>
-                    <p>{meta.description}</p>
-                    <p className="subtle">Accuracy: {meta.accuracy ?? 'n/a'}</p>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h3>Regression models</h3>
-              <ul className="model-list">
-                {Object.entries(modelMeta.regression_models).map(([key, meta]) => (
-                  <li key={key}>
-                    <strong>{key}</strong>
-                    <p>{meta.description}</p>
-                    <p className="subtle">
-                      R² {meta.r2_score ?? '—'} | RMSE {meta.rmse ?? '—'} | MAE {meta.mae ?? '—'}
+                  <div
+                    key={key}
+                    style={{
+                      backgroundColor: '#f9fafb',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '8px',
+                      padding: '20px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '12px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                      <h4 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#111827', textTransform: 'capitalize' }}>
+                        {key.replace(/_/g, ' ')}
+                      </h4>
+                      <span
+                        style={{
+                          backgroundColor: '#dbeafe',
+                          color: '#1e40af',
+                          padding: '4px 8px',
+                          borderRadius: '4px',
+                          fontSize: '11px',
+                          fontWeight: 600,
+                          textTransform: 'uppercase',
+                        }}
+                      >
+                        Classification
+                      </span>
+                    </div>
+                    <p style={{ margin: 0, fontSize: '14px', color: '#6b7280', lineHeight: '1.5' }}>
+                      {meta.description}
                     </p>
-                  </li>
+                    <div
+                      style={{
+                        marginTop: '8px',
+                        paddingTop: '12px',
+                        borderTop: '1px solid #e5e7eb',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '8px',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 600, color: '#374151', minWidth: '80px' }}>Accuracy:</span>
+                        <span
+                          style={{
+                            fontSize: '14px',
+                            fontWeight: 600,
+                            color: meta.accuracy && meta.accuracy !== 'n/a' ? '#059669' : '#6b7280',
+                          }}
+                        >
+                          {meta.accuracy ?? 'N/A'}
+                        </span>
+                      </div>
+                      {meta.best_for && (
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                          <span style={{ fontSize: '13px', fontWeight: 600, color: '#374151', minWidth: '80px' }}>Best for:</span>
+                          <span style={{ fontSize: '13px', color: '#6b7280' }}>{meta.best_for}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 ))}
-              </ul>
+              </div>
+            </div>
+
+            {/* Regression Models Section */}
+            <div>
+              <h3 style={{ marginBottom: '16px', fontSize: '18px', fontWeight: 600, color: '#111827' }}>
+                Regression Models
+              </h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
+                {Object.entries(modelMeta.regression_models).map(([key, meta]) => (
+                  <div
+                    key={key}
+                    style={{
+                      backgroundColor: '#f9fafb',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '8px',
+                      padding: '20px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '12px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                      <h4 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#111827', textTransform: 'capitalize' }}>
+                        {key.replace(/_/g, ' ')}
+                      </h4>
+                      <span
+                        style={{
+                          backgroundColor: '#fef3c7',
+                          color: '#92400e',
+                          padding: '4px 8px',
+                          borderRadius: '4px',
+                          fontSize: '11px',
+                          fontWeight: 600,
+                          textTransform: 'uppercase',
+                        }}
+                      >
+                        Regression
+                      </span>
+                    </div>
+                    <p style={{ margin: 0, fontSize: '14px', color: '#6b7280', lineHeight: '1.5' }}>
+                      {meta.description}
+                    </p>
+                    <div
+                      style={{
+                        marginTop: '8px',
+                        paddingTop: '12px',
+                        borderTop: '1px solid #e5e7eb',
+                        display: 'grid',
+                        gridTemplateColumns: '1fr 1fr',
+                        gap: '12px',
+                      }}
+                    >
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: 500 }}>R² Score</span>
+                        <span
+                          style={{
+                            fontSize: '15px',
+                            fontWeight: 600,
+                            color: meta.r2_score && meta.r2_score !== '—' ? '#059669' : '#6b7280',
+                          }}
+                        >
+                          {meta.r2_score ?? '—'}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: 500 }}>RMSE</span>
+                        <span
+                          style={{
+                            fontSize: '15px',
+                            fontWeight: 600,
+                            color: meta.rmse && meta.rmse !== '—' ? '#dc2626' : '#6b7280',
+                          }}
+                        >
+                          {meta.rmse ?? '—'}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: 500 }}>MAE</span>
+                        <span
+                          style={{
+                            fontSize: '15px',
+                            fontWeight: 600,
+                            color: meta.mae && meta.mae !== '—' ? '#dc2626' : '#6b7280',
+                          }}
+                        >
+                          {meta.mae ?? '—'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         ) : (
-          <p>Loading model metadata...</p>
+          <div style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>
+            <p>Loading model metadata...</p>
+          </div>
         )}
       </section>
 
