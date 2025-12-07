@@ -56,7 +56,7 @@ sqlite3 ed_database.db < db_import.sql
 python app.py
 ```
 
-API will be available at `http://localhost:5000`
+API will be available at `http://localhost:5001`
 
 ## API Endpoints
 
@@ -81,16 +81,16 @@ API will be available at `http://localhost:5000`
 - `GET /api/chief-complaints` - Chief complaint distribution
 - `GET /api/staff` - Staff list
 
-### Prediction Endpoints (NEW!)
+### Prediction Endpoints
 - `GET /api/predictions/models/info` - Get information about available models
 - `POST /api/predictions/esi` - Predict ESI level from patient characteristics
 - `POST /api/predictions/wait-time` - Predict wait time for a patient
 - `GET /api/predictions/volume` - Forecast patient arrival volume
 
-### Future Endpoints
-- `GET /api/wait-times` - Wait time analysis
-- `GET /api/statistics/wait-times-by-esi` - Wait times by ESI level
-- `GET /api/statistics/length-of-stay` - Length of stay analysis
+### Wait Time & Length of Stay Analysis
+- `GET /api/wait-times` - Wait time analysis with optional ESI filtering
+- `GET /api/statistics/wait-times-by-esi` - Wait times grouped by ESI level
+- `GET /api/statistics/length-of-stay` - Length of stay statistics by ESI and disposition
 
 ## Statistical Models
 

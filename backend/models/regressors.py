@@ -53,12 +53,8 @@ class WaitTimePredictor:
             X: Feature matrix
             y: Wait times in minutes
         """
-        # TODO: Implement feature engineering
-        # - Calculate wait time from arrival_ts to provider_start_ts
-        # - One-hot encode categorical variables
-        # - Extract time features (hour, day of week, month)
-        # - Calculate ED volume at time of arrival
-        # - Handle LWBS cases (no provider_start_ts)
+        # NOTE: Feature engineering is performed in scripts/train_models.py
+        # This method is kept for API compatibility but not currently used
         pass
 
     def train(self, X_train, y_train):
@@ -200,11 +196,8 @@ class PatientVolumePredictor:
         Returns:
             Time series with hourly patient counts
         """
-        # TODO: Implement time series preparation
-        # - Parse arrival timestamps
-        # - Group by hour
-        # - Count arrivals per hour
-        # - Add temporal features (hour, day of week, month)
+        # NOTE: Time series preparation is performed in scripts/train_models.py
+        # This method is kept for API compatibility but not currently used
         pass
 
     def train(self, X_train, y_train):

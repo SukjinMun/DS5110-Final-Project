@@ -61,11 +61,8 @@ class ESIClassifier:
             X: Feature matrix
             y: ESI level labels (if present)
         """
-        # TODO: Implement feature engineering
-        # - One-hot encode categorical variables (chief complaint, arrival mode, sex, payor type)
-        # - Calculate age from DOB
-        # - Extract vital signs (use most recent or first vitals)
-        # - Handle missing values
+        # NOTE: Feature engineering is performed in scripts/train_models.py
+        # This method is kept for API compatibility but not currently used
         pass
 
     def train(self, X_train, y_train):
