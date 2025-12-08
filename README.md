@@ -147,8 +147,22 @@ The database is auto-generated from CSV files on first run. CSV data files are i
 
 ## Methodology
 
+### Data Pipeline Stages
+
+**Stage 1: Generated Data (Raw CSV)**
+- 8,000 encounters generated with target ESI distribution
+
+**Stage 2: Database (After ETL Cleaning)** — *Used by Frontend Dashboard*
+- **7,486 encounters** (93.58% retention after ETL validation)
+- ESI Distribution: Level 1: 6.0%, Level 2: 19.9%, **Level 3: 38.7%**, Level 4: 25.1%, Level 5: 10.3%
+
+**Stage 3: Classification-Ready (After dropna)** — *Used by ML Models*
+- **5,369 encounters** (71.72% retention from database)
+- ESI Distribution: Level 1: 6.0%, Level 2: 20.2%, **Level 3: 38.8%**, Level 4: 24.9%, Level 5: 10.1%
+- Train: 3,758 samples (70%) | Test: 1,611 samples (30%)
+
 ### Data Preprocessing
-- **SMOTE (Synthetic Minority Over-sampling Technique)**: Applied to handle class imbalance in ESI levels (Level 3 is 55% majority class)
+- **SMOTE (Synthetic Minority Over-sampling Technique)**: Applied to handle class imbalance in ESI levels (Level 3 is ~39% majority class)
 - **StandardScaler**: Normalized all numerical features for model training
 - **One-hot encoding**: Converted categorical variables (sex, arrival mode, chief complaint, payor type)
 
@@ -156,13 +170,13 @@ The database is auto-generated from CSV files on first run. CSV data files are i
 - Calculated wait times (arrival to provider start) and length of stay metrics
 - Extracted temporal features: hour, day of week, month, weekend indicator
 - Merged patient demographics, first vital signs per encounter, and payor information
-- Created 31 engineered features total from 7,486 encounters
+- Created 31 engineered features total from 5,369 classification-ready encounters
 
 ### Model Selection & Training
 - **Classification Models**: Trained 5 models (Logistic Regression, Random Forest, Gradient Boosting, LDA, Naive Bayes) for ESI prediction
 - **Regression Models**: Linear Regression for wait time prediction, Poisson GLM for volume forecasting
 - **Cross-Validation**: 5-fold CV used to ensure generalization (all models show <1% standard deviation)
-- **Train/Test Split**: 80/20 split with stratification on ESI levels
+- **Train/Test Split**: 70/30 split with stratification on ESI levels
 
 ## Results & Model Performance
 
