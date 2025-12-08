@@ -461,22 +461,179 @@ def get_chief_complaints():
 @api_bp.route('/staff', methods=['GET'])
 @with_session
 def get_staff():
-    """Get staff list"""
+    """Get staff list with optional filtering, search, and sorting"""
     session = get_session()
+    try:
+        # Query parameters for filtering
+        active_only = request.args.get('active_only', default='false').lower() == 'true'
+        limit = request.args.get('limit', default=100, type=int)
+        offset = request.args.get('offset', default=0, type=int)
+        
+        # Search parameter
+        search = request.args.get('search', type=str)
+        
+        # Sort parameters
+        sort_by = request.args.get('sort_by', default='staff_id', type=str)
+        sort_order = request.args.get('sort_order', default='asc', type=str)
 
-    active_only = request.args.get('active_only', default='false').lower() == 'true'
+        query = session.query(Staff)
 
-    query = session.query(Staff)
+        # Apply filters
+        if active_only:
+            query = query.filter(Staff.is_active == 1)
+        
+        # Apply search (searches across multiple fields)
+        if search:
+            search_term = f'%{search}%'
+            query = query.filter(
+                (Staff.first_name.like(search_term)) |
+                (Staff.last_name.like(search_term)) |
+                (Staff.role_code.like(search_term)) |
+                (Staff.department.like(search_term)) |
+                (text(f"CAST(staff.staff_id AS TEXT)").like(search_term))
+            )
 
-    if active_only:
-        query = query.filter(Staff.is_active == 1)
+        # Apply sorting
+        sort_column = None
+        valid_sort_columns = {
+            'staff_id': Staff.staff_id,
+            'first_name': Staff.first_name,
+            'last_name': Staff.last_name,
+            'role_code': Staff.role_code,
+            'department': Staff.department,
+            'is_active': Staff.is_active,
+        }
+        
+        if sort_by in valid_sort_columns:
+            sort_column = valid_sort_columns[sort_by]
+        else:
+            sort_column = Staff.staff_id  # Default sort
+        
+        if sort_order.lower() == 'desc':
+            query = query.order_by(desc(sort_column))
+        else:
+            query = query.order_by(sort_column)
 
-    staff = query.all()
+        # Get total count before pagination
+        total = query.count()
+        
+        # Apply pagination
+        staff = query.limit(limit).offset(offset).all()
 
-    return jsonify({
-        'total': len(staff),
-        'staff': [s.to_dict() for s in staff]
-    })
+        return jsonify({
+            'total': total,
+            'limit': limit,
+            'offset': offset,
+            'sort_by': sort_by,
+            'sort_order': sort_order,
+            'search': search,
+            'staff': [s.to_dict() for s in staff]
+        })
+    finally:
+        session.close()
+
+@api_bp.route('/staff', methods=['POST'])
+@with_session
+def create_staff():
+    """Create a new staff member"""
+    session = get_session()
+    try:
+        data = request.get_json()
+        
+        # Validate required fields
+        if 'first_name' not in data or 'last_name' not in data or 'role_code' not in data:
+            return jsonify({'error': 'first_name, last_name, and role_code are required'}), 400
+        
+        # Create new staff member
+        staff = Staff(
+            first_name=data['first_name'],
+            last_name=data['last_name'],
+            role_code=data['role_code'],
+            department=data.get('department'),
+            is_active=data.get('is_active', 1)
+        )
+        
+        session.add(staff)
+        session.commit()
+        session.refresh(staff)
+        
+        return jsonify({
+            'message': 'Staff member created successfully',
+            'staff': staff.to_dict()
+        }), 201
+    except Exception as e:
+        session.rollback()
+        return jsonify({'error': str(e)}), 400
+    finally:
+        session.close()
+
+@api_bp.route('/staff/<int:staff_id>', methods=['PUT'])
+@with_session
+def update_staff(staff_id):
+    """Update an existing staff member"""
+    session = get_session()
+    try:
+        staff = session.query(Staff).filter(Staff.staff_id == staff_id).first()
+        
+        if not staff:
+            return jsonify({'error': 'Staff member not found'}), 404
+        
+        data = request.get_json()
+        
+        # Update fields if provided
+        if 'first_name' in data:
+            staff.first_name = data['first_name']
+        if 'last_name' in data:
+            staff.last_name = data['last_name']
+        if 'role_code' in data:
+            staff.role_code = data['role_code']
+        if 'department' in data:
+            staff.department = data['department']
+        if 'is_active' in data:
+            staff.is_active = 1 if data['is_active'] else 0
+        
+        session.commit()
+        session.refresh(staff)
+        
+        return jsonify({
+            'message': 'Staff member updated successfully',
+            'staff': staff.to_dict()
+        })
+    except Exception as e:
+        session.rollback()
+        return jsonify({'error': str(e)}), 400
+    finally:
+        session.close()
+
+@api_bp.route('/staff/<int:staff_id>', methods=['DELETE'])
+@with_session
+def delete_staff(staff_id):
+    """Delete a staff member"""
+    session = get_session()
+    try:
+        staff = session.query(Staff).filter(Staff.staff_id == staff_id).first()
+        
+        if not staff:
+            return jsonify({'error': 'Staff member not found'}), 404
+        
+        # Check if staff has assignments (optional: prevent deletion if assigned)
+        assignments = session.query(StaffAssignment).filter(StaffAssignment.staff_id == staff_id).count()
+        if assignments > 0:
+            return jsonify({
+                'error': f'Cannot delete staff member with {assignments} active assignment(s). Please remove assignments first.'
+            }), 400
+        
+        session.delete(staff)
+        session.commit()
+        
+        return jsonify({
+            'message': 'Staff member deleted successfully'
+        })
+    except Exception as e:
+        session.rollback()
+        return jsonify({'error': str(e)}), 400
+    finally:
+        session.close()
 
 @api_bp.route('/wait-times', methods=['GET'])
 @with_session

@@ -85,6 +85,11 @@ export interface StaffMember {
 
 export interface StaffResponse {
   total: number
+  limit?: number
+  offset?: number
+  sort_by?: string
+  sort_order?: string
+  search?: string
   staff: StaffMember[]
 }
 

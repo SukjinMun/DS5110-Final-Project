@@ -61,12 +61,35 @@ export const updateEncounter = (encounterId: number, encounter: Partial<Encounte
 export const deleteEncounter = (encounterId: number) =>
   extractData<{ message: string }>(apiClient.delete(`/encounters/${encounterId}`))
 
-export const fetchStaff = (activeOnly: boolean) =>
+export const fetchStaff = (params: {
+  activeOnly?: boolean
+  limit?: number
+  offset?: number
+  search?: string
+  sort_by?: string
+  sort_order?: 'asc' | 'desc'
+} = {}) =>
   extractData<StaffResponse>(
     apiClient.get('/staff', {
-      params: { active_only: activeOnly },
+      params: {
+        active_only: params.activeOnly ?? false,
+        limit: params.limit,
+        offset: params.offset,
+        search: params.search,
+        sort_by: params.sort_by,
+        sort_order: params.sort_order,
+      },
     }),
   )
+
+export const createStaff = (staff: Partial<StaffMember>) =>
+  extractData<{ message: string; staff: StaffMember }>(apiClient.post('/staff', staff))
+
+export const updateStaff = (staffId: number, staff: Partial<StaffMember>) =>
+  extractData<{ message: string; staff: StaffMember }>(apiClient.put(`/staff/${staffId}`, staff))
+
+export const deleteStaff = (staffId: number) =>
+  extractData<{ message: string }>(apiClient.delete(`/staff/${staffId}`))
 
 export const predictEsi = (payload: EsiPredictionRequest) =>
   extractData<EsiPredictionResponse>(apiClient.post('/predictions/esi', payload))
