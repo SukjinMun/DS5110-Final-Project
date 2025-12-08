@@ -12,6 +12,34 @@
 
 This project analyzes Emergency Department triage classification and patient flow using a normalized relational database and statistical modeling. Core focus: database design, statistical analysis, data visualization, and Flask web application development.
 
+## Model Results
+
+*Results below are from the classification-ready dataset (5,369 encounters after dropna preprocessing).*
+
+### Pipeline Architecture
+<p align="center">
+  <img src="figures/slide_models_overview_diagram.png" width="700">
+</p>
+
+### Classification Results
+
+<table>
+  <tr>
+    <td><b>ESI Distribution</b></td>
+    <td><b>Cross-Validation Results</b></td>
+  </tr>
+  <tr>
+    <td><img src="figures/slide8_esi_donut.png" width="400"></td>
+    <td><img src="figures/slide2_cv_results.png" width="400"></td>
+  </tr>
+  <tr>
+    <td colspan="2" align="center"><b>Confusion Matrices (All Models)</b></td>
+  </tr>
+  <tr>
+    <td colspan="2" align="center"><img src="figures/slide3_validation_confusion_matrices.png" width="700"></td>
+  </tr>
+</table>
+
 ## Objectives
 
 **Core (Required):**
