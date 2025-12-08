@@ -1,7 +1,7 @@
 # Emergency Department Model Training Results
 
 **Author:** Suk Jin Mun
-**Date:** December 2, 2025 (Updated)
+**Date:** December 8, 2025 (Updated)
 **Course:** DS 5110, Fall 2025
 
 ## Executive Summary
@@ -23,16 +23,16 @@ Successfully trained and evaluated statistical models using Emergency Department
 Predict Emergency Severity Index (ESI) level (1-5) from patient demographics, vital signs, and arrival characteristics.
 
 ### Dataset Characteristics
-- **Total Samples:** 6,397 encounters (after removing missing data)
-- **Features:** 27 (after one-hot encoding)
-- **Train/Test Split:** 70/30 (4,477 train, 1,920 test)
+- **Total Samples:** 5,369 encounters (after removing missing data)
+- **Features:** 31 (after one-hot encoding)
+- **Train/Test Split:** 70/30 (3,758 train, 1,611 test)
 - **Class Distribution:**
   ```
-  ESI Level 1:  120 samples (1.9%) - Most critical
-  ESI Level 2:  867 samples (13.6%)
-  ESI Level 3: 3,508 samples (54.8%) - Majority class
-  ESI Level 4: 1,406 samples (22.0%)
-  ESI Level 5:  496 samples (7.8%) - Least urgent
+  ESI Level 1:  322 samples (6.0%) - Most critical
+  ESI Level 2: 1,086 samples (20.2%)
+  ESI Level 3: 2,081 samples (38.8%) - Majority class
+  ESI Level 4: 1,336 samples (24.9%)
+  ESI Level 5:  544 samples (10.1%) - Least urgent
   ```
 
 ### Preprocessing
@@ -313,6 +313,6 @@ model_validation.py    - Validation methodology implementation
 
 ---
 
-**Document Version:** 2.0
-**Last Updated:** December 2, 2025
+**Document Version:** 2.1
+**Last Updated:** December 8, 2025
 **Prepared by:** Suk Jin Mun
