@@ -8,9 +8,13 @@
 
 </div>
 
+---
+
 ## Overview
 
 This project analyzes Emergency Department triage classification and patient flow using a normalized relational database and statistical modeling. Core focus: database design, statistical analysis, data visualization, and Flask web application development.
+
+---
 
 ## Frontend Dashboard
 
@@ -18,33 +22,163 @@ This project analyzes Emergency Department triage classification and patient flo
   <img src="figures/frontend.png" width="800">
 </p>
 
+---
+
 ## Model Results
 
 *Results below are from the classification-ready dataset (5,369 encounters after dropna preprocessing).*
 
-### Pipeline Architecture
+### Data Pipeline
+
 <p align="center">
-  <img src="figures/slide_models_overview_diagram.png" width="700">
+  <img src="figs/data_pipeline_stages.png" width="750">
 </p>
+
+*Pipeline stages: 8,000 generated encounters → 7,486 after ETL cleaning → 5,369 classification-ready with complete features.*
+
+---
 
 ### Classification Results
 
-<table>
-  <tr>
-    <td><b>ESI Distribution</b></td>
-    <td><b>Cross-Validation Results</b></td>
-  </tr>
-  <tr>
-    <td><img src="figures/slide8_esi_donut.png" width="400"></td>
-    <td><img src="figures/slide2_cv_results.png" width="400"></td>
-  </tr>
-  <tr>
-    <td colspan="2" align="center"><b>Confusion Matrices (All Models)</b></td>
-  </tr>
-  <tr>
-    <td colspan="2" align="center"><img src="figures/slide3_validation_confusion_matrices.png" width="700"></td>
-  </tr>
-</table>
+#### Model Performance Comparison
+
+<p align="center">
+  <img src="figs/model_comparison_summary.png" width="800">
+</p>
+
+*Comprehensive comparison of all five classification models across test accuracy, AUC score, and 5-fold cross-validation accuracy.*
+
+#### ESI Class Distribution
+
+<p align="center">
+  <img src="figs/esi_class_distribution.png" width="800">
+</p>
+
+*Left: Original imbalanced distribution (ESI 3 at 38.8%). Right: Balanced distribution after SMOTE oversampling.*
+
+#### Confusion Matrices
+
+<p align="center">
+  <img src="figs/validation_confusion_matrices.png" width="850">
+</p>
+
+*Confusion matrices for all five classification models. Logistic Regression achieves 85.66% accuracy with strong diagonal dominance.*
+
+#### ROC Curves
+
+<p align="center">
+  <img src="figs/validation_roc_curves.png" width="850">
+</p>
+
+*Multi-class ROC curves (One-vs-Rest). All models achieve AUC > 0.90, with Logistic Regression and Random Forest achieving AUC > 0.97.*
+
+#### Learning Curves (Bias-Variance Analysis)
+
+<p align="center">
+  <img src="figs/validation_learning_curves.png" width="850">
+</p>
+
+*Learning curves for bias-variance tradeoff analysis. Logistic Regression shows excellent generalization (minimal gap between training and validation).*
+
+#### Feature Importance (Random Forest)
+
+<p align="center">
+  <img src="figs/feature_importance_rf.png" width="700">
+</p>
+
+*Top 15 features by importance. Vital signs (SpO₂, heart rate, respiratory rate) dominate, aligning with ESI Handbook V5 guidelines.*
+
+#### Logistic Regression Coefficients
+
+<p align="center">
+  <img src="figs/logistic_coefficients.png" width="700">
+</p>
+
+*Logistic regression coefficient analysis showing feature contributions to ESI level predictions.*
+
+#### Precision-Recall Curves
+
+<p align="center">
+  <img src="figs/precision_recall_curves.png" width="850">
+</p>
+
+*Precision-recall curves for all ESI levels across different classification models.*
+
+---
+
+### Regression Results
+
+#### Wait Time Prediction (Residual Analysis)
+
+<p align="center">
+  <img src="figs/regression_residual_analysis.png" width="800">
+</p>
+
+*Left: Residuals vs Fitted values showing homoscedasticity. Right: Q-Q plot confirming approximate normality of residuals. R² = 0.857, RMSE = 14.17 min.*
+
+#### Wait Time Prediction Intervals
+
+<p align="center">
+  <img src="figs/regression_prediction_intervals.png" width="700">
+</p>
+
+*Actual vs predicted wait times with 95% prediction intervals.*
+
+#### Influence Diagnostics
+
+<p align="center">
+  <img src="figs/influence_diagnostics.png" width="800">
+</p>
+
+*Regression influence diagnostics: Cook's distance and leverage analysis for outlier detection.*
+
+#### Volume Forecasting (Time Series)
+
+<p align="center">
+  <img src="figs/volume_prediction_timeseries.png" width="800">
+</p>
+
+*Patient volume forecasting using Poisson GLM. RMSE = 0.86 patients/hour. Weekends show 29% higher volume.*
+
+---
+
+## Database Design
+
+### Entity-Relationship Diagram
+
+<p align="center">
+  <img src="figs/er_diagram.png" width="800">
+</p>
+
+*Normalized 3NF database schema with 7 core entities: patient, encounter, vitals, diagnosis, staff, staff_assignment, and encounter_payor.*
+
+---
+
+## Statistical Models Summary
+
+### Classification Models (ESI Prediction)
+
+| Model | Accuracy | AUC | 5-Fold CV |
+|-------|----------|-----|-----------|
+| **Logistic Regression** | **85.66%** | 0.9756 | 85.66% ± 0.82% |
+| Random Forest | 85.47% | 0.9764 | 85.47% ± 0.91% |
+| Gradient Boosting | 84.30% | 0.9696 | 83.91% ± 0.76% |
+| LDA | 83.80% | 0.9712 | 84.22% ± 0.88% |
+| Naive Bayes | 60.58% | 0.9049 | 77.81% ± 0.94% |
+
+*Logistic Regression selected for production due to best accuracy and excellent generalization (minimal train-validation gap).*
+
+### Regression Models
+
+| Model | Metric | Value |
+|-------|--------|-------|
+| Wait Time (Linear Regression) | R² | 0.8570 |
+| Wait Time (Linear Regression) | RMSE | 14.17 min |
+| Wait Time (Linear Regression) | MAE | 11.32 min |
+| Volume (Poisson GLM) | RMSE | 0.86 patients/hour |
+| Volume (Poisson GLM) | MAE | 0.67 patients/hour |
+
+---
 
 ## Objectives
 
@@ -54,6 +188,8 @@ This project analyzes Emergency Department triage classification and patient flo
 3. Create data visualizations for hospital administrators
 4. Provide actionable recommendations for resource allocation
 5. Build Flask web application with interactive dashboard
+
+---
 
 ## Project Structure
 
@@ -82,22 +218,14 @@ DS5110-Final-Project/
 │   ├── diagnosis.csv         # Diagnoses (ICD-10)
 │   ├── staff.csv             # Staff information
 │   └── generate_ed_csvs.py   # Data generation script
+├── figs/                       # Model output figures
 ├── trained_models/             # Serialized ML models (.pkl)
-│   ├── esi_random_forest.pkl    # ESI classification (Random Forest) - BEST
-│   ├── esi_gradient_boosting.pkl # ESI classification (Gradient Boosting)
-│   ├── esi_logistic.pkl         # ESI classification (Logistic Regression)
-│   ├── esi_lda.pkl              # ESI classification (LDA)
-│   ├── esi_naive_bayes.pkl      # ESI classification (Naive Bayes)
-│   ├── wait_time_predictor.pkl  # Wait time regression
-│   └── volume_predictor.pkl     # Patient volume (Poisson GLM)
 ├── notebooks/                  # Jupyter notebooks for analysis
-│   └── 01_model_evaluation.ipynb
 ├── scripts/                    # Training and testing scripts
-│   ├── train_models.py
-│   └── test_models.py
-├── docs/                       # Documentation
-└── project_progress_tracker.xlsx
+└── docs/                       # Documentation
 ```
+
+---
 
 ## Installation
 
@@ -131,6 +259,8 @@ npm run dev
 
 The database is auto-generated from CSV files on first run. CSV data files are in `dataset/`.
 
+---
+
 ## API Endpoints
 
 ### Data Endpoints (`/api`)
@@ -145,8 +275,6 @@ The database is auto-generated from CSV files on first run. CSV data files are i
 | `/api/statistics/overview` | GET | ED overview statistics |
 | `/api/statistics/esi` | GET | ESI level statistics |
 | `/api/statistics/vitals` | GET | Vital signs statistics |
-| `/api/statistics/payor` | GET | Payor distribution |
-| `/api/statistics/diagnoses` | GET | Top diagnoses |
 
 ### Prediction Endpoints (`/api/predictions`)
 
@@ -157,27 +285,7 @@ The database is auto-generated from CSV files on first run. CSV data files are i
 | `/api/predictions/wait-time` | POST | Predict wait time |
 | `/api/predictions/volume` | GET | Predict patient volume |
 
-## Statistical Models
-
-### Classification Models (ESI Prediction)
-
-| Model | Accuracy | AUC | 5-Fold CV |
-|-------|----------|-----|-----------|
-| **Logistic Regression** | **85.66%** | 0.9756 | 84.75% ±0.83% |
-| Random Forest | 85.47% | 0.9764 | 85.08% ±0.92% |
-| Gradient Boosting | 84.30% | 0.9696 | 84.11% ±1.10% |
-| LDA | 83.80% | 0.9712 | 82.96% ±0.53% |
-| Naive Bayes | 60.58% | 0.9049 | 57.70% ±10.02% |
-
-*Metrics from DS5110 class (Ch4, Week 6) and cited literature. Model accuracy (~84-86%) aligns with published ML studies on real ESI data (70-80%). Dataset uses 30% nurse variability to match real-world triage disagreement rates.*
-
-### Regression Models
-
-| Model | Metric | Value |
-|-------|--------|-------|
-| Wait Time (Linear Regression) | R² | 0.8570 |
-| Wait Time (Linear Regression) | RMSE | 14.17 min |
-| Volume (Poisson GLM) | RMSE | 0.86 patients/hour |
+---
 
 ## Methodology
 
@@ -196,65 +304,16 @@ The database is auto-generated from CSV files on first run. CSV data files are i
 - Train: 3,758 samples (70%) | Test: 1,611 samples (30%)
 
 ### Data Preprocessing
-- **SMOTE (Synthetic Minority Over-sampling Technique)**: Applied to handle class imbalance in ESI levels (Level 3 is ~39% majority class)
-- **StandardScaler**: Normalized all numerical features for model training
-- **One-hot encoding**: Converted categorical variables (sex, arrival mode, chief complaint, payor type)
+- **SMOTE**: Applied to handle class imbalance in ESI levels
+- **StandardScaler**: Normalized all numerical features
+- **One-hot encoding**: Converted categorical variables
 
 ### Feature Engineering
-- Calculated wait times (arrival to provider start) and length of stay metrics
-- Extracted temporal features: hour, day of week, month, weekend indicator
-- Merged patient demographics, first vital signs per encounter, and payor information
-- Created 31 engineered features total from 5,369 classification-ready encounters
+- 31 engineered features from demographics, vital signs, arrival characteristics, and temporal features
+- Wait time calculation: arrival to provider start
+- Temporal features: hour, day of week, weekend indicator
 
-### Model Selection & Training
-- **Classification Models**: Trained 5 models (Logistic Regression, Random Forest, Gradient Boosting, LDA, Naive Bayes) for ESI prediction
-- **Regression Models**: Linear Regression for wait time prediction, Poisson GLM for volume forecasting
-- **Cross-Validation**: 5-fold CV used to ensure generalization (all models show <1% standard deviation)
-- **Train/Test Split**: 70/30 split with stratification on ESI levels
-
-## Results & Model Performance
-
-### ESI Classification Results
-
-**Best Model: Logistic Regression (85.66% Accuracy)**
-- Test Accuracy: 85.66%
-- AUC Score: 0.9756
-- 5-Fold CV Accuracy: 84.75% ± 0.83%
-
-**Model Comparison:**
-
-| Model | Test Accuracy | AUC | CV Accuracy (mean ± std) |
-|-------|---------------|-----|--------------------------|
-| Logistic Regression | 85.66% | 0.9756 | 84.75% ± 0.83% |
-| Random Forest | 85.47% | 0.9764 | 85.08% ± 0.92% |
-| Gradient Boosting | 84.30% | 0.9696 | 84.11% ± 1.10% |
-| LDA | 83.80% | 0.9712 | 82.96% ± 0.53% |
-| Naive Bayes | 60.58% | 0.9049 | 57.70% ± 10.02% |
-
-**Confusion Matrix (Test Set):**
-- Overall accuracy: 88.7%
-- ESI Level 2 Recall: 94.4% (critical for patient safety - ensures high-acuity patients are correctly identified)
-- Error pattern: Most errors occur between adjacent ESI levels, which is clinically realistic
-
-### Wait Time Prediction Results
-- R² Score: 0.857 (highly effective)
-- RMSE: 14.17 minutes
-- MAE: 11.32 minutes
-- Key Finding: Each ESI level increase correlates with 40 minutes longer wait time, validating that urgent patients are seen faster
-
-### Volume Forecasting Results
-- RMSE: 0.86 patients/hour
-- MAE: 0.67 patients/hour
-- Key Findings:
-  - Weekends show 29% higher patient volume
-  - Evening hours (18:00-22:00) show peak arrivals
-  - Useful for shift planning and resource allocation
-
-### Validation Against Published Research
-Our results (85% accuracy) align with published benchmarks:
-- **Ivanov et al. (2021)**: KATE algorithm achieved 75.7% accuracy on 166,000 real ED cases
-- **Levin et al. (2018)**: ML-based triage showed 70-80% accuracy on clinical data
-- Our model includes 30% nurse variability matching real-world clinical practice
+---
 
 ## Demo & Usage
 
@@ -278,82 +337,12 @@ Our results (85% accuracy) align with published benchmarks:
 
 ### Training Models (Optional)
 
-To retrain models from scratch:
-
 ```bash
-# Train all models (ESI classification, wait time, volume forecasting)
 cd scripts
 python train_models.py
-
-# This will:
-# 1. Load data from ed_database.db
-# 2. Engineer features
-# 3. Train 5 classification models + 2 regression models
-# 4. Save models to trained_models/ directory
-# 5. Generate performance metrics and visualizations
 ```
 
-### Model Evaluation Notebook
-
-```bash
-# View detailed model evaluation
-cd notebooks
-jupyter notebook 01_model_evaluation.ipynb
-```
-
-### Example API Calls
-
-**Predict ESI Level:**
-```bash
-curl http://localhost:5001/api/predictions/esi -X POST \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "random_forest",
-    "features": {
-      "patient_age": 45,
-      "sex_at_birth": "M",
-      "arrival_mode": "Walk-in",
-      "chief_complaint": "Chest pain",
-      "heart_rate": 95,
-      "bp_systolic": 140,
-      "bp_diastolic": 85,
-      "respiratory_rate": 18,
-      "temperature_c": 37.0,
-      "o2_saturation": 97,
-      "pain_score": 7,
-      "arrival_hour": 14,
-      "arrival_day_of_week": 3,
-      "is_weekend": 0,
-      "payor_type": "private"
-    }
-  }'
-```
-
-**Predict Wait Time:**
-```bash
-curl http://localhost:5001/api/predictions/wait-time -X POST \
-  -H "Content-Type: application/json" \
-  -d '{
-    "features": {
-      "esi_level": 3,
-      "patient_age": 45,
-      "sex_at_birth": "M",
-      "arrival_mode": "Walk-in",
-      "heart_rate": 88,
-      "bp_systolic": 130,
-      "respiratory_rate": 16,
-      "temperature_c": 37.0,
-      "o2_saturation": 98,
-      "arrival_hour": 14,
-      "is_weekend": 0
-    }
-  }'
-```
-
-**Forecast Patient Volume:**
-```bash
-curl "http://localhost:5001/api/predictions/volume?hour=18&day_of_week=5&month=11&is_weekend=1"
-```
+---
 
 ## Team Roles
 
@@ -374,6 +363,15 @@ curl "http://localhost:5001/api/predictions/volume?hour=18&day_of_week=5&month=1
 - Simulated ED data generation
 - ETL pipeline development
 - SQL analytical queries
+
+---
+
+## References
+
+1. Suamchaiyaphum K, Jones AR, Polancich S. The accuracy of triage classification using Emergency Severity Index. *International Emergency Nursing*. 2024;77:101537.
+2. Ivanov O, Wolf L, Brecher D, et al. Improving ED Emergency Severity Index Acuity Assignment Using Machine Learning and Clinical Natural Language Processing. *Journal of Emergency Nursing*. 2021;47(2):265-278.e7.
+
+---
 
 ## License
 
