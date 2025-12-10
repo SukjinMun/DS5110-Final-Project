@@ -421,27 +421,85 @@ def get_payor_statistics():
 @api_bp.route('/statistics/diagnoses', methods=['GET'])
 @with_session
 def get_diagnosis_statistics():
-    """Get diagnosis code statistics"""
+    """Get diagnosis code statistics
+    
+    Query parameters:
+    - start_date: Optional. Filter from this date (YYYY-MM-DD or YYYY-MM-DD HH:MM:SS)
+    - end_date: Optional. Filter to this date (YYYY-MM-DD or YYYY-MM-DD HH:MM:SS)
+    - date: Optional. Filter for a specific date (YYYY-MM-DD). If provided, filters for that entire day.
+    """
     session = get_session()
-
-    # Top diagnoses
-    diagnosis_dist = session.query(
-        Diagnosis.code,
-        func.count(Diagnosis.encounter_id).label('count')
-    ).group_by(Diagnosis.code).order_by(desc('count')).limit(10).all()
-
-    # Primary diagnosis count
-    primary_count = session.query(func.count(Diagnosis.encounter_id)).filter(
-        Diagnosis.is_primary == 1
-    ).scalar()
-
-    total_diagnoses = session.query(func.count(Diagnosis.encounter_id)).scalar()
-
-    return jsonify({
-        'total_diagnoses': total_diagnoses,
-        'primary_diagnosis_count': primary_count,
-        'top_diagnoses': [{'code': code, 'count': count} for code, count in diagnosis_dist]
-    })
+    try:
+        # Get date filters
+        start_date = request.args.get('start_date', type=str)
+        end_date = request.args.get('end_date', type=str)
+        date = request.args.get('date', type=str)
+        
+        # If date is provided, set start and end to that day
+        if date:
+            try:
+                from datetime import datetime
+                datetime.strptime(date, '%Y-%m-%d')
+                start_date = f"{date} 00:00:00"
+                end_date = f"{date} 23:59:59"
+            except ValueError:
+                return jsonify({'error': 'Invalid date format. Use YYYY-MM-DD'}), 400
+        
+        # Build query with optional date filtering
+        diagnosis_query = session.query(
+            Diagnosis.code,
+            func.count(Diagnosis.encounter_id).label('count')
+        )
+        
+        # Join with encounter for date filtering
+        if start_date or end_date:
+            diagnosis_query = diagnosis_query.join(Encounter, Diagnosis.encounter_id == Encounter.encounter_id)
+            if start_date:
+                diagnosis_query = diagnosis_query.filter(Encounter.arrival_ts >= start_date)
+            if end_date:
+                diagnosis_query = diagnosis_query.filter(Encounter.arrival_ts <= end_date)
+        
+        diagnosis_dist = diagnosis_query.group_by(Diagnosis.code).order_by(desc('count')).limit(10).all()
+        
+        # Primary diagnosis count with date filtering
+        primary_query = session.query(func.count(Diagnosis.encounter_id)).filter(
+            Diagnosis.is_primary == 1
+        )
+        if start_date or end_date:
+            primary_query = primary_query.join(Encounter, Diagnosis.encounter_id == Encounter.encounter_id)
+            if start_date:
+                primary_query = primary_query.filter(Encounter.arrival_ts >= start_date)
+            if end_date:
+                primary_query = primary_query.filter(Encounter.arrival_ts <= end_date)
+        primary_count = primary_query.scalar()
+        
+        # Total diagnoses with date filtering
+        total_query = session.query(func.count(Diagnosis.encounter_id))
+        if start_date or end_date:
+            total_query = total_query.join(Encounter, Diagnosis.encounter_id == Encounter.encounter_id)
+            if start_date:
+                total_query = total_query.filter(Encounter.arrival_ts >= start_date)
+            if end_date:
+                total_query = total_query.filter(Encounter.arrival_ts <= end_date)
+        total_diagnoses = total_query.scalar()
+        
+        response_data = {
+            'total_diagnoses': total_diagnoses,
+            'primary_diagnosis_count': primary_count,
+            'top_diagnoses': [{'code': code, 'count': count} for code, count in diagnosis_dist]
+        }
+        
+        # Add date range info if filtering
+        if start_date or end_date or date:
+            response_data['date_filter'] = {
+                'date': date if date else None,
+                'start_date': start_date if start_date else None,
+                'end_date': end_date if end_date else None
+            }
+        
+        return jsonify(response_data)
+    finally:
+        session.close()
 
 @api_bp.route('/chief-complaints', methods=['GET'])
 @with_session
@@ -700,21 +758,53 @@ def get_wait_times():
 @api_bp.route('/statistics/wait-times-by-esi', methods=['GET'])
 @with_session
 def get_wait_times_by_esi():
-    """Get wait time statistics grouped by ESI level"""
+    """Get wait time statistics grouped by ESI level
+    
+    Query parameters:
+    - start_date: Optional. Filter from this date (YYYY-MM-DD or YYYY-MM-DD HH:MM:SS)
+    - end_date: Optional. Filter to this date (YYYY-MM-DD or YYYY-MM-DD HH:MM:SS)
+    - date: Optional. Filter for a specific date (YYYY-MM-DD). If provided, filters for that entire day.
+    """
     session = get_session()
     try:
+        # Get date filters
+        start_date = request.args.get('start_date', type=str)
+        end_date = request.args.get('end_date', type=str)
+        date = request.args.get('date', type=str)
+        
+        # If date is provided, set start and end to that day
+        if date:
+            try:
+                from datetime import datetime
+                datetime.strptime(date, '%Y-%m-%d')
+                start_date = f"{date} 00:00:00"
+                end_date = f"{date} 23:59:59"
+            except ValueError:
+                return jsonify({'error': 'Invalid date format. Use YYYY-MM-DD'}), 400
+        
         esi_stats = []
         
         for esi in range(1, 6):
             # Calculate wait times for this ESI level using raw SQL
-            query = text("""
+            query_str = """
                 SELECT CAST((julianday(provider_start_ts) - julianday(arrival_ts)) * 1440 AS INTEGER) AS wait_time_minutes
                 FROM encounter
                 WHERE esi_level = :esi_level
                   AND arrival_ts IS NOT NULL AND arrival_ts != ''
                   AND provider_start_ts IS NOT NULL AND provider_start_ts != ''
-            """)
-            results = session.execute(query, {'esi_level': esi}).fetchall()
+            """
+            params = {'esi_level': esi}
+            
+            # Add date filtering if provided
+            if start_date:
+                query_str += " AND arrival_ts >= :start_date"
+                params['start_date'] = start_date
+            if end_date:
+                query_str += " AND arrival_ts <= :end_date"
+                params['end_date'] = end_date
+            
+            query = text(query_str)
+            results = session.execute(query, params).fetchall()
             
             if results:
                 wait_times = [r[0] for r in results if r[0] is not None]
@@ -746,9 +836,19 @@ def get_wait_times_by_esi():
                     'median_wait_minutes': 0
                 })
         
-        return jsonify({
+        response_data = {
             'wait_times_by_esi': esi_stats
-        })
+        }
+        
+        # Add date range info if filtering
+        if start_date or end_date or date:
+            response_data['date_filter'] = {
+                'date': date if date else None,
+                'start_date': start_date if start_date else None,
+                'end_date': end_date if end_date else None
+            }
+        
+        return jsonify(response_data)
     finally:
         session.close()
 
@@ -856,3 +956,188 @@ def get_length_of_stay():
         })
     finally:
         session.close()
+
+@api_bp.route('/statistics/patient-volume-by-hour', methods=['GET'])
+@with_session
+def get_patient_volume_by_hour():
+    """Get patient volume by hour of day
+    
+    Query parameters:
+    - start_date: Optional. Filter from this date (YYYY-MM-DD or YYYY-MM-DD HH:MM:SS)
+    - end_date: Optional. Filter to this date (YYYY-MM-DD or YYYY-MM-DD HH:MM:SS)
+    - date: Optional. Filter for a specific date (YYYY-MM-DD). If provided, filters for that entire day.
+    """
+    session = get_session()
+    try:
+        # Get date filters
+        start_date = request.args.get('start_date', type=str)
+        end_date = request.args.get('end_date', type=str)
+        date = request.args.get('date', type=str)
+        
+        # If date is provided, set start and end to that day
+        if date:
+            try:
+                from datetime import datetime
+                datetime.strptime(date, '%Y-%m-%d')
+                start_date = f"{date} 00:00:00"
+                end_date = f"{date} 23:59:59"
+            except ValueError:
+                return jsonify({'error': 'Invalid date format. Use YYYY-MM-DD'}), 400
+        
+        # Build query
+        query_str = """
+            SELECT 
+                CAST(strftime('%H', arrival_ts) AS INTEGER) as hour,
+                COUNT(*) as patient_count
+            FROM encounter
+            WHERE arrival_ts IS NOT NULL AND arrival_ts != ''
+        """
+        params = {}
+        
+        if start_date:
+            query_str += " AND arrival_ts >= :start_date"
+            params['start_date'] = start_date
+        if end_date:
+            query_str += " AND arrival_ts <= :end_date"
+            params['end_date'] = end_date
+        
+        query_str += " GROUP BY hour ORDER BY hour"
+        
+        volume_results = session.execute(text(query_str), params).fetchall()
+        
+        # Initialize all hours with 0
+        volume_by_hour = {hour: 0 for hour in range(24)}
+        for row in volume_results:
+            hour = int(row[0])
+            count = int(row[1])
+            volume_by_hour[hour] = count
+        
+        # Convert to list format
+        patient_volume_by_hour = [
+            {'hour': hour, 'patient_count': volume_by_hour[hour]}
+            for hour in range(24)
+        ]
+        
+        response_data = {
+            'patient_volume_by_hour': patient_volume_by_hour,
+            'total_patients': sum(vol['patient_count'] for vol in patient_volume_by_hour)
+        }
+        
+        # Add date range info if filtering
+        if start_date or end_date or date:
+            response_data['date_filter'] = {
+                'date': date if date else None,
+                'start_date': start_date if start_date else None,
+                'end_date': end_date if end_date else None
+            }
+        
+        return jsonify(response_data)
+    finally:
+        session.close()
+
+@api_bp.route('/statistics/staff-workload', methods=['GET'])
+@with_session
+def get_staff_workload():
+    """Get staff workload distribution
+    
+    Query parameters:
+    - start_date: Optional. Filter from this date (YYYY-MM-DD or YYYY-MM-DD HH:MM:SS)
+    - end_date: Optional. Filter to this date (YYYY-MM-DD or YYYY-MM-DD HH:MM:SS)
+    - date: Optional. Filter for a specific date (YYYY-MM-DD). If provided, filters for that entire day.
+    """
+    session = get_session()
+    try:
+        # Get date filters
+        start_date = request.args.get('start_date', type=str)
+        end_date = request.args.get('end_date', type=str)
+        date = request.args.get('date', type=str)
+        
+        # If date is provided, set start and end to that day
+        if date:
+            try:
+                from datetime import datetime
+                datetime.strptime(date, '%Y-%m-%d')
+                start_date = f"{date} 00:00:00"
+                end_date = f"{date} 23:59:59"
+            except ValueError:
+                return jsonify({'error': 'Invalid date format. Use YYYY-MM-DD'}), 400
+        
+        # Build query
+        query_str = """
+            SELECT 
+                s.staff_id,
+                s.first_name,
+                s.last_name,
+                s.role_code,
+                COUNT(DISTINCT sa.encounter_id) as encounter_count,
+                COUNT(sa.encounter_id) as assignment_count
+            FROM staff s
+            INNER JOIN staff_assignment sa ON s.staff_id = sa.staff_id
+            INNER JOIN encounter e ON sa.encounter_id = e.encounter_id
+            WHERE e.arrival_ts IS NOT NULL 
+              AND e.arrival_ts != ''
+              AND s.is_active = 1
+        """
+        params = {}
+        
+        if start_date:
+            query_str += " AND e.arrival_ts >= :start_date"
+            params['start_date'] = start_date
+        if end_date:
+            query_str += " AND e.arrival_ts <= :end_date"
+            params['end_date'] = end_date
+        
+        query_str += " GROUP BY s.staff_id, s.first_name, s.last_name, s.role_code ORDER BY encounter_count DESC, assignment_count DESC"
+        
+        staff_workload_results = session.execute(text(query_str), params).fetchall()
+        
+        staff_workload = []
+        for row in staff_workload_results:
+            staff_workload.append({
+                'staff_id': int(row[0]),
+                'first_name': row[1],
+                'last_name': row[2],
+                'role_code': row[3],
+                'encounter_count': int(row[4]),
+                'assignment_count': int(row[5])
+            })
+        
+        # Group by role for summary
+        role_workload = {}
+        for staff in staff_workload:
+            role = staff['role_code']
+            if role not in role_workload:
+                role_workload[role] = {
+                    'role_code': role,
+                    'staff_count': 0,
+                    'total_encounters': 0,
+                    'total_assignments': 0
+                }
+            role_workload[role]['staff_count'] += 1
+            role_workload[role]['total_encounters'] += staff['encounter_count']
+            role_workload[role]['total_assignments'] += staff['assignment_count']
+        
+        role_workload_list = sorted(
+            role_workload.values(),
+            key=lambda x: x['total_encounters'],
+            reverse=True
+        )
+        
+        response_data = {
+            'by_staff': staff_workload,
+            'by_role': role_workload_list,
+            'total_staff_active': len(staff_workload)
+        }
+        
+        # Add date range info if filtering
+        if start_date or end_date or date:
+            response_data['date_filter'] = {
+                'date': date if date else None,
+                'start_date': start_date if start_date else None,
+                'end_date': end_date if end_date else None
+            }
+        
+        return jsonify(response_data)
+    finally:
+        session.close()
+
