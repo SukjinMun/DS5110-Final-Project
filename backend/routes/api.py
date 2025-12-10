@@ -421,27 +421,83 @@ def get_payor_statistics():
 @api_bp.route('/statistics/diagnoses', methods=['GET'])
 @with_session
 def get_diagnosis_statistics():
-    """Get diagnosis code statistics"""
+    """Get diagnosis code statistics with optional date filtering
+
+    Query parameters:
+    - start_date: Filter encounters from this date (ISO format: YYYY-MM-DD)
+    - end_date: Filter encounters until this date (ISO format: YYYY-MM-DD)
+    - date: Single date filter (ISO format: YYYY-MM-DD) - shorthand for start_date=end_date
+
+    POST-PRESENTATION UPDATE: Added date filtering support for cross-validation
+    with SQL queries on specific date ranges (e.g., January 14, 2025).
+    """
     session = get_session()
+    try:
+        # Get optional date filtering parameters
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        single_date = request.args.get('date')
 
-    # Top diagnoses
-    diagnosis_dist = session.query(
-        Diagnosis.code,
-        func.count(Diagnosis.encounter_id).label('count')
-    ).group_by(Diagnosis.code).order_by(desc('count')).limit(10).all()
+        # If single date provided, use it for both start and end
+        if single_date:
+            start_date = single_date
+            end_date = single_date
 
-    # Primary diagnosis count
-    primary_count = session.query(func.count(Diagnosis.encounter_id)).filter(
-        Diagnosis.is_primary == 1
-    ).scalar()
+        # Build query with optional date filtering
+        base_query = """
+            SELECT d.code, COUNT(*) as frequency
+            FROM diagnosis d
+            JOIN encounter e ON d.encounter_id = e.encounter_id
+            WHERE 1=1
+        """
+        params = {}
 
-    total_diagnoses = session.query(func.count(Diagnosis.encounter_id)).scalar()
+        # Add date filtering if provided
+        if start_date:
+            base_query += " AND date(e.arrival_ts) >= :start_date"
+            params['start_date'] = start_date
+        if end_date:
+            base_query += " AND date(e.arrival_ts) <= :end_date"
+            params['end_date'] = end_date
 
-    return jsonify({
-        'total_diagnoses': total_diagnoses,
-        'primary_diagnosis_count': primary_count,
-        'top_diagnoses': [{'code': code, 'count': count} for code, count in diagnosis_dist]
-    })
+        base_query += " GROUP BY d.code ORDER BY frequency DESC LIMIT 10"
+
+        # Execute top diagnoses query
+        diagnosis_dist = session.execute(text(base_query), params).fetchall()
+
+        # Build count queries with same date filters
+        count_query = """
+            SELECT COUNT(*) FROM diagnosis d
+            JOIN encounter e ON d.encounter_id = e.encounter_id
+            WHERE 1=1
+        """
+        primary_query = """
+            SELECT COUNT(*) FROM diagnosis d
+            JOIN encounter e ON d.encounter_id = e.encounter_id
+            WHERE d.is_primary = 1
+        """
+
+        if start_date:
+            count_query += " AND date(e.arrival_ts) >= :start_date"
+            primary_query += " AND date(e.arrival_ts) >= :start_date"
+        if end_date:
+            count_query += " AND date(e.arrival_ts) <= :end_date"
+            primary_query += " AND date(e.arrival_ts) <= :end_date"
+
+        total_diagnoses = session.execute(text(count_query), params).scalar()
+        primary_count = session.execute(text(primary_query), params).scalar()
+
+        return jsonify({
+            'total_diagnoses': total_diagnoses,
+            'primary_diagnosis_count': primary_count,
+            'date_range': {
+                'start_date': start_date if start_date else 'all',
+                'end_date': end_date if end_date else 'all'
+            },
+            'top_diagnoses': [{'code': row[0], 'count': row[1]} for row in diagnosis_dist]
+        })
+    finally:
+        session.close()
 
 @api_bp.route('/chief-complaints', methods=['GET'])
 @with_session
