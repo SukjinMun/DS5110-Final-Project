@@ -700,21 +700,44 @@ def get_wait_times():
 @api_bp.route('/statistics/wait-times-by-esi', methods=['GET'])
 @with_session
 def get_wait_times_by_esi():
-    """Get wait time statistics grouped by ESI level"""
+    """Get wait time statistics grouped by ESI level with optional date filtering
+
+    Query parameters:
+    - start_date: Filter encounters from this date (ISO format: YYYY-MM-DD)
+    - end_date: Filter encounters until this date (ISO format: YYYY-MM-DD)
+
+    POST-PRESENTATION UPDATE: Added date filtering support for cross-validation
+    with SQL queries on specific date ranges (e.g., January 14, 2025).
+    """
     session = get_session()
     try:
+        # Get optional date filtering parameters (POST-PRESENTATION UPDATE)
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+
         esi_stats = []
-        
+
         for esi in range(1, 6):
-            # Calculate wait times for this ESI level using raw SQL
-            query = text("""
+            # Build query with optional date filtering
+            base_query = """
                 SELECT CAST((julianday(provider_start_ts) - julianday(arrival_ts)) * 1440 AS INTEGER) AS wait_time_minutes
                 FROM encounter
                 WHERE esi_level = :esi_level
                   AND arrival_ts IS NOT NULL AND arrival_ts != ''
                   AND provider_start_ts IS NOT NULL AND provider_start_ts != ''
-            """)
-            results = session.execute(query, {'esi_level': esi}).fetchall()
+            """
+            params = {'esi_level': esi}
+
+            # Add date filtering if provided (POST-PRESENTATION UPDATE)
+            if start_date:
+                base_query += " AND date(arrival_ts) >= :start_date"
+                params['start_date'] = start_date
+            if end_date:
+                base_query += " AND date(arrival_ts) <= :end_date"
+                params['end_date'] = end_date
+
+            query = text(base_query)
+            results = session.execute(query, params).fetchall()
             
             if results:
                 wait_times = [r[0] for r in results if r[0] is not None]
