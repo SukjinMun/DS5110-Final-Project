@@ -856,3 +856,167 @@ def get_length_of_stay():
         })
     finally:
         session.close()
+
+@api_bp.route('/statistics/staff-workload', methods=['GET'])
+@with_session
+def get_staff_workload():
+    """Get staff workload statistics with optional date filtering
+
+    Query parameters:
+    - start_date: Filter encounters from this date (ISO format: YYYY-MM-DD)
+    - end_date: Filter encounters until this date (ISO format: YYYY-MM-DD)
+
+    Returns:
+    - Per-staff metrics: patient count, average encounter duration, ESI distribution
+    - Workload distribution by role
+    - Overall summary statistics
+    """
+    session = get_session()
+    try:
+        # Get optional date filtering parameters
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+
+        # Build base query to get staff assignments with encounter details
+        base_query = """
+            SELECT
+                sa.staff_id,
+                s.first_name || ' ' || s.last_name as staff_name,
+                s.role_code as staff_role,
+                sa.assignment_role,
+                sa.encounter_id,
+                e.esi_level,
+                e.arrival_ts,
+                e.departure_ts,
+                sa.assigned_ts,
+                sa.released_ts,
+                CAST((julianday(e.departure_ts) - julianday(e.arrival_ts)) * 1440 AS INTEGER) AS encounter_duration_minutes,
+                CAST((julianday(sa.released_ts) - julianday(sa.assigned_ts)) * 1440 AS INTEGER) AS assignment_duration_minutes
+            FROM staff_assignment sa
+            JOIN staff s ON sa.staff_id = s.staff_id
+            JOIN encounter e ON sa.encounter_id = e.encounter_id
+            WHERE e.arrival_ts IS NOT NULL AND e.arrival_ts != ''
+              AND e.departure_ts IS NOT NULL AND e.departure_ts != ''
+        """
+
+        # Add date filtering if provided
+        params = {}
+        if start_date:
+            base_query += " AND date(e.arrival_ts) >= :start_date"
+            params['start_date'] = start_date
+        if end_date:
+            base_query += " AND date(e.arrival_ts) <= :end_date"
+            params['end_date'] = end_date
+
+        base_query += " ORDER BY sa.staff_id, e.arrival_ts"
+
+        # Execute query
+        results = session.execute(text(base_query), params).fetchall()
+
+        # Process results into staff-level statistics
+        staff_workload = {}
+        role_workload = {}
+
+        for row in results:
+            staff_id = row[0]
+            staff_name = row[1]
+            staff_role = row[2]
+            assignment_role = row[3]
+            encounter_id = row[4]
+            esi_level = row[5]
+            encounter_duration = row[10]
+            assignment_duration = row[11]
+
+            # Initialize staff entry if not exists
+            if staff_id not in staff_workload:
+                staff_workload[staff_id] = {
+                    'staff_id': staff_id,
+                    'staff_name': staff_name,
+                    'staff_role': staff_role,
+                    'patient_count': 0,
+                    'encounter_durations': [],
+                    'assignment_durations': [],
+                    'esi_distribution': {1: 0, 2: 0, 3: 0, 4: 0, 5: 0},
+                    'assignment_roles': {}
+                }
+
+            # Update staff metrics
+            staff_workload[staff_id]['patient_count'] += 1
+            if encounter_duration is not None:
+                staff_workload[staff_id]['encounter_durations'].append(encounter_duration)
+            if assignment_duration is not None:
+                staff_workload[staff_id]['assignment_durations'].append(assignment_duration)
+            if esi_level:
+                staff_workload[staff_id]['esi_distribution'][esi_level] += 1
+
+            # Track assignment roles
+            if assignment_role not in staff_workload[staff_id]['assignment_roles']:
+                staff_workload[staff_id]['assignment_roles'][assignment_role] = 0
+            staff_workload[staff_id]['assignment_roles'][assignment_role] += 1
+
+            # Track role-level workload
+            if staff_role not in role_workload:
+                role_workload[staff_role] = {
+                    'role': staff_role,
+                    'staff_count': set(),
+                    'patient_count': 0,
+                    'encounter_durations': []
+                }
+            role_workload[staff_role]['staff_count'].add(staff_id)
+            role_workload[staff_role]['patient_count'] += 1
+            if encounter_duration is not None:
+                role_workload[staff_role]['encounter_durations'].append(encounter_duration)
+
+        # Calculate final statistics for each staff member
+        staff_stats = []
+        for staff_id, data in staff_workload.items():
+            encounter_durations = data['encounter_durations']
+            assignment_durations = data['assignment_durations']
+
+            staff_stats.append({
+                'staff_id': data['staff_id'],
+                'staff_name': data['staff_name'],
+                'staff_role': data['staff_role'],
+                'patient_count': data['patient_count'],
+                'average_encounter_duration_minutes': round(sum(encounter_durations) / len(encounter_durations), 2) if encounter_durations else 0,
+                'average_assignment_duration_minutes': round(sum(assignment_durations) / len(assignment_durations), 2) if assignment_durations else 0,
+                'total_assignment_time_minutes': sum(assignment_durations) if assignment_durations else 0,
+                'esi_distribution': data['esi_distribution'],
+                'assignment_roles': data['assignment_roles']
+            })
+
+        # Calculate role-level statistics
+        role_stats = []
+        for role, data in role_workload.items():
+            encounter_durations = data['encounter_durations']
+
+            role_stats.append({
+                'role': role,
+                'staff_count': len(data['staff_count']),
+                'total_patient_count': data['patient_count'],
+                'average_patients_per_staff': round(data['patient_count'] / len(data['staff_count']), 2) if data['staff_count'] else 0,
+                'average_encounter_duration_minutes': round(sum(encounter_durations) / len(encounter_durations), 2) if encounter_durations else 0
+            })
+
+        # Sort results
+        staff_stats.sort(key=lambda x: x['patient_count'], reverse=True)
+        role_stats.sort(key=lambda x: x['total_patient_count'], reverse=True)
+
+        # Calculate overall statistics
+        total_assignments = len(results)
+        total_unique_staff = len(staff_workload)
+        total_patients = sum(s['patient_count'] for s in staff_stats)
+
+        return jsonify({
+            'total_assignments': total_assignments,
+            'total_unique_staff': total_unique_staff,
+            'total_patients_served': total_patients,
+            'date_range': {
+                'start_date': start_date if start_date else 'all',
+                'end_date': end_date if end_date else 'all'
+            },
+            'staff_workload': staff_stats,
+            'workload_by_role': role_stats
+        })
+    finally:
+        session.close()
